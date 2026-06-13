@@ -5,11 +5,11 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.itemsIndexed
-import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -17,8 +17,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import coil.compose.AsyncImage
@@ -39,14 +41,16 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             ImageSearchTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = if (isSystemInDarkTheme()) Color.Black else Color.White
+                ) {
                     var searchResults by remember { mutableStateOf<List<SearchItem>>(emptyList()) }
                     var isLoading by remember { mutableStateOf(false) }
 
                     ImageSearchScreen(
                         images = searchResults,
                         isLoading = isLoading,
-                        modifier = Modifier.padding(innerPadding),
                         onSearchTriggered = { query ->
                             currentQuery = query
                             lifecycleScope.launch(Dispatchers.IO) {
@@ -79,13 +83,7 @@ class MainActivity : ComponentActivity() {
                                         withContext(Dispatchers.Main) {
                                             val novosFiltrados = newItems.filter { novo -> !searchResults.any { it.link == novo.link } }
                                             val updatedList = (searchResults + novosFiltrados)
-
-                                            // Lógica de janela deslizante: mantém 100 itens, remove os 40 mais velhos
-                                            searchResults = if (updatedList.size > 100) {
-                                                updatedList.drop(40)
-                                            } else {
-                                                updatedList
-                                            }
+                                            searchResults = if (updatedList.size > 100) updatedList.drop(40) else updatedList
                                         }
                                     } finally {
                                         isCurrentlyLoadingNextPage = false
@@ -102,79 +100,71 @@ class MainActivity : ComponentActivity() {
     private fun parseDuckDuckGoJson(json: String): List<SearchItem> {
         val blockRegex = """"image"\s*:\s*"([^"]+)"[^}]+"source"\s*:\s*"([^"]+)"""".toRegex()
         val matches = blockRegex.findAll(json)
-        val sitesPrioritarios = listOf("amazon", "reddit", "wikipedia", "pinterest")
-        val cloudflareBlacklist = listOf("wallpapercrafter", "wallpapersden", "hdwallpapers", "wallpaperflare")
-
         return matches.map { match ->
             SearchItem(link = match.groups[1]?.value?.replace("\\/", "/") ?: "", source = match.groups[2]?.value?.lowercase() ?: "")
-        }.filter { item ->
-            item.link.startsWith("http") && !cloudflareBlacklist.any { domain -> item.link.contains(domain) }
-        }.distinctBy { it.link }
-            .sortedByDescending { item -> sitesPrioritarios.any { site -> item.source.contains(site) } }
-            .toList()
+        }.filter { it.link.startsWith("http") }.distinctBy { it.link }.toList()
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ImageSearchScreen(images: List<SearchItem>, isLoading: Boolean, modifier: Modifier, onSearchTriggered: (String) -> Unit, onLoadNextPage: (Int) -> Unit) {
+fun ImageSearchScreen(images: List<SearchItem>, isLoading: Boolean, onSearchTriggered: (String) -> Unit, onLoadNextPage: (Int) -> Unit) {
     var searchQuery by remember { mutableStateOf("") }
-    val gridState = rememberLazyStaggeredGridState()
+    val isDark = isSystemInDarkTheme()
+    val focusManager = LocalFocusManager.current
 
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize()) {
         SearchBar(
-            query = searchQuery, onQueryChange = { searchQuery = it }, onSearch = { onSearchTriggered(searchQuery) },
-            active = false, onActiveChange = {}, placeholder = { Text("Pesquisar...") },
+            query = searchQuery,
+            onQueryChange = { searchQuery = it },
+            onSearch = {
+                onSearchTriggered(searchQuery)
+                focusManager.clearFocus() // Fecha o teclado após a busca
+            },
+            active = false,
+            onActiveChange = {},
+            placeholder = { Text("Pesquisar...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Buscar") },
-            modifier = Modifier.fillMaxWidth().padding(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            colors = SearchBarDefaults.colors(
+                containerColor = if (isDark) Color(0xFF121212) else Color(0xFFE0E0E0)
+            )
         ) {}
 
         if (isLoading && images.isEmpty()) {
-            Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator() }
+            Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = Color.Gray) }
         } else {
             LazyVerticalStaggeredGrid(
-                state = gridState,
                 columns = StaggeredGridCells.Fixed(2),
-                contentPadding = PaddingValues(8.dp),
+                contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = 8.dp),
                 verticalItemSpacing = 8.dp,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 itemsIndexed(items = images, key = { _, item -> item.link }) { index, item ->
-                    // Dispara novo carregamento sempre que chegar próximo ao fim da lista
-                    if (index >= images.size - 3) {
-                        LaunchedEffect(images.size) { onLoadNextPage(images.size) }
-                    }
+                    if (index >= images.size - 3) { LaunchedEffect(images.size) { onLoadNextPage(images.size) } }
                     key(item.link) {
-                        ImageGridItem(item.link)
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isDark) Color.Black else Color.White
+                            )
+                        ) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current).data(item.link).crossfade(true).build(),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(0.75f)
+                            )
+                        }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun ImageGridItem(imageUrl: String) {
-    var isError by remember { mutableStateOf(false) }
-
-    if (!isError) {
-        Card(
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(imageUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(0.75f),
-                onError = { isError = true }
-            )
         }
     }
 }

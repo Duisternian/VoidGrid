@@ -2,10 +2,10 @@ package com.duisternis.voidgrid.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Tons de Cinza para um tema Monocromático
+val Neutral90 = Color(0xFFE0E0E0) // Cinza claro
+val Neutral80 = Color(0xFFBDBDBD)
+val Neutral40 = Color(0xFF616161) // Cinza médio
+val Neutral30 = Color(0xFF424242)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+val DarkGray = Color(0xFF121212) // Cinza quase preto

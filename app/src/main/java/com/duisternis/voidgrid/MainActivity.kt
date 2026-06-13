@@ -5,9 +5,6 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
@@ -73,8 +70,7 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onLoadNextPage = { currentListSize ->
-                            // Limite total de 40 itens para manter a fluidez
-                            if (currentVqd.isNotEmpty() && !isCurrentlyLoadingNextPage && currentListSize < 40) {
+                            if (currentVqd.isNotEmpty() && !isCurrentlyLoadingNextPage) {
                                 isCurrentlyLoadingNextPage = true
                                 lifecycleScope.launch(Dispatchers.IO) {
                                     try {
@@ -82,7 +78,14 @@ class MainActivity : ComponentActivity() {
                                         val newItems = parseDuckDuckGoJson(jsonResponse)
                                         withContext(Dispatchers.Main) {
                                             val novosFiltrados = newItems.filter { novo -> !searchResults.any { it.link == novo.link } }
-                                            searchResults = (searchResults + novosFiltrados).take(40) // Garante o limite de 40
+                                            val updatedList = (searchResults + novosFiltrados)
+
+                                            // Lógica de janela deslizante: mantém 100 itens, remove os 40 mais velhos
+                                            searchResults = if (updatedList.size > 100) {
+                                                updatedList.drop(40)
+                                            } else {
+                                                updatedList
+                                            }
                                         }
                                     } finally {
                                         isCurrentlyLoadingNextPage = false
@@ -138,7 +141,8 @@ fun ImageSearchScreen(images: List<SearchItem>, isLoading: Boolean, modifier: Mo
                 modifier = Modifier.fillMaxSize()
             ) {
                 itemsIndexed(items = images, key = { _, item -> item.link }) { index, item ->
-                    if (index >= images.size - 5 && images.size < 40) {
+                    // Dispara novo carregamento sempre que chegar próximo ao fim da lista
+                    if (index >= images.size - 3) {
                         LaunchedEffect(images.size) { onLoadNextPage(images.size) }
                     }
                     key(item.link) {
@@ -165,10 +169,10 @@ fun ImageGridItem(imageUrl: String) {
                     .crossfade(true)
                     .build(),
                 contentDescription = null,
-                contentScale = ContentScale.Crop, // Crop mantém o bloco estável
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(0.75f), // Fixa a proporção para evitar o pulo
+                    .aspectRatio(0.75f),
                 onError = { isError = true }
             )
         }

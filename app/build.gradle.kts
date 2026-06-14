@@ -57,6 +57,10 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material-icons-extended")
+    // Biblioteca do Material 3 (essencial para o tema e componentes)
+    implementation("androidx.compose.material3:material3:1.3.0")
+    // Componentes de integração com o sistema (o que permite o tema ser aplicado globalmente)
+    implementation("androidx.compose.material:material-icons-extended:1.6.8")
 
     // 5. Bibliotecas Externas
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
@@ -64,6 +68,7 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-scalars:2.11.0")
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("org.jsoup:jsoup:1.17.2")
+    implementation("androidx.appcompat:appcompat:1.7.0")
 
     // 6. Testes e Debug
     testImplementation(libs.junit)

@@ -1,22 +1,26 @@
 package com.duisternis.voidgrid
 
 import retrofit2.http.GET
-import retrofit2.http.Header
 import retrofit2.http.Query
 
 interface GoogleSearchApi {
-    @GET("/")
+    @GET(".")
     suspend fun getVqdToken(
         @Query("q") query: String,
-        @Header("User-Agent") userAgent: String = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        @Query("ia") ia: String = "images",
+        @Query("iax") iax: String = "images",
+        @Query("t") t: String = "h_",
+        @Query("chip-select") chipSelect: String = "search"
     ): String
 
     @GET("i.js")
     suspend fun getImagesJson(
         @Query("q") query: String,
         @Query("vqd") vqd: String,
-        @Query("s") skip: Int, // 🟢 INDICA A PARTIR DE QUAL IMAGEM COMPLEMENTAR O FEED
+        @Query("s") skip: Int = 0,
         @Query("o") format: String = "json",
-        @Header("User-Agent") userAgent: String = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        @Query("p") safeSearch: String = "-2",  // kp, não p
+        @Query("f") filters: String = ",,,,,",
+        @Query("l") region: String = "us-en"     // us-en, não wt-wt
     ): String
 }

@@ -44,8 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.*
 import androidx.paging.compose.collectAsLazyPagingItems
 import coil.ImageLoader
@@ -62,7 +64,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-class ImageSearchViewModel : ViewModel() {
+class ImageSearchViewModel(private val tokenCache: TokenCache) : ViewModel() {
     private val _query = MutableStateFlow<String?>(null)
     val currentQuery: StateFlow<String?> = _query.asStateFlow()
 
@@ -77,7 +79,7 @@ class ImageSearchViewModel : ViewModel() {
                     enablePlaceholders = false,
                     initialLoadSize = 35
                 ),
-                pagingSourceFactory = { SearchPagingSource(query, RetrofitClient.googleSearchApi) }
+                pagingSourceFactory = { SearchPagingSource(query, RetrofitClient.googleSearchApi, tokenCache) }
             ).flow
         }.cachedIn(viewModelScope)
 
@@ -86,17 +88,33 @@ class ImageSearchViewModel : ViewModel() {
     }
 }
 
+class ImageSearchViewModelFactory(private val tokenCache: TokenCache) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(ImageSearchViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return ImageSearchViewModel(tokenCache) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
+
 class MainActivity : ComponentActivity() {
-    private val viewModel: ImageSearchViewModel by viewModels()
+    private lateinit var tokenCache: TokenCache
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        tokenCache = TokenCache(this)
+
         setContent {
             ImageSearchTheme {
-                val imageLoader = remember { createCustomImageLoader(this) }
+                val imageLoader = remember { createCustomImageLoader(this@MainActivity) }
                 CompositionLocalProvider(LocalImageLoader provides imageLoader) {
+                    val viewModel: ImageSearchViewModel = viewModel(
+                        factory = ImageSearchViewModelFactory(tokenCache)
+                    )
+
                     val pagingItems = viewModel.pagingDataFlow.collectAsLazyPagingItems()
                     val currentQuery by viewModel.currentQuery.collectAsState()
 
@@ -158,17 +176,23 @@ fun ImageSearchScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(count = pagingItems.itemCount) { index ->
+            items(
+                count = pagingItems.itemCount,
+                key = { index -> pagingItems[index]?.link?.hashCode() ?: index }
+            ) { index ->
                 val item = pagingItems[index]
                 if (item != null) {
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { focusManager.clearFocus(); selectedItem = item }
-                            .animateItem(placementSpec = tween(durationMillis = 800))
                     ) {
                         AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current).data(item.link).crossfade(500).build(),
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(item.link)
+                                .crossfade(500)
+                                .memoryCacheKey(item.link)
+                                .build(),
                             imageLoader = imageLoader,
                             contentDescription = null,
                             contentScale = ContentScale.FillWidth,
@@ -233,16 +257,16 @@ fun ImageSearchScreen(
                 }
             }
         }
-    }
 
-    selectedItem?.let { item ->
-        ImageDetailDialog(
-            item = item,
-            allImages = pagingItems.itemSnapshotList.items,
-            onDismiss = { selectedItem = null },
-            activity = LocalContext.current as MainActivity,
-            imageLoader = imageLoader
-        )
+        selectedItem?.let { item ->
+            ImageDetailDialog(
+                item = item,
+                allImages = pagingItems.itemSnapshotList.items,
+                onDismiss = { selectedItem = null },
+                activity = LocalContext.current as MainActivity,
+                imageLoader = imageLoader
+            )
+        }
     }
 }
 
@@ -276,7 +300,11 @@ fun ImageDetailDialog(
                     Column {
                         IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null, tint = Color.White) }
                         AsyncImage(
-                            model = currentItem.link,
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(currentItem.link)
+                                .crossfade(500)
+                                .memoryCacheKey(currentItem.link)
+                                .build(),
                             imageLoader = imageLoader,
                             contentDescription = null,
                             modifier = Modifier.fillMaxWidth().wrapContentHeight(),
@@ -301,7 +329,11 @@ fun ImageDetailDialog(
                 }
                 items(suggestedItems) { similar ->
                     AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(similar.link).build(),
+                        model = ImageRequest.Builder(LocalContext.current)
+                            .data(similar.link)
+                            .crossfade(500)
+                            .memoryCacheKey(similar.link)
+                            .build(),
                         imageLoader = imageLoader,
                         contentDescription = null,
                         modifier = Modifier

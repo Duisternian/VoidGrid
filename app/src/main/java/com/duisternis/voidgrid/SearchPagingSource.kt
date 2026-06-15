@@ -9,7 +9,8 @@ import kotlinx.serialization.json.jsonPrimitive
 
 class SearchPagingSource(
     private val query: String,
-    private val api: GoogleSearchApi
+    private val api: GoogleSearchApi,
+    private val tokenCache: TokenCache
 ) : PagingSource<Int, SearchItem>() {
 
     private val jsonParser = Json { ignoreUnknownKeys = true }
@@ -20,13 +21,9 @@ class SearchPagingSource(
         return try {
             val vqd = cachedVqd ?: run {
                 try {
-                    val html = RetrofitClient.htmlApi.getVqdToken(query)
-                    val vqdMatch = Regex("""vqd=["']?([0-9-]+)["']?""").find(html)
-                    val extracted = vqdMatch?.groupValues?.getOrNull(1)
-                    if (extracted.isNullOrEmpty()) {
-                        return LoadResult.Error(Exception("VQD não encontrado"))
-                    }
-                    extracted.also { cachedVqd = it }
+                    tokenCache.getOrFetch(query) {
+                        RetrofitClient.htmlApi.getVqdToken(query)
+                    }.also { cachedVqd = it }
                 } catch (e: Exception) {
                     return LoadResult.Error(e)
                 }

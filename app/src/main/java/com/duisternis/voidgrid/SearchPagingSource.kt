@@ -14,17 +14,22 @@ class SearchPagingSource(
 
     private val jsonParser = Json { ignoreUnknownKeys = true }
     private var cachedVqd: String? = null
-    private var nextSkip: Int = 0  // controla o skip real
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SearchItem> {
         val position = params.key ?: 0
         return try {
             val vqd = cachedVqd ?: run {
-                val html = api.getVqdToken(query)
-                val extracted = """vqd=["']?([0-9-]+)["']?""".toRegex()
-                    .find(html)?.groupValues?.getOrNull(1)
-                if (extracted.isNullOrEmpty()) return LoadResult.Error(Exception("VQD não encontrado"))
-                extracted.also { cachedVqd = it }
+                try {
+                    val html = RetrofitClient.htmlApi.getVqdToken(query)
+                    val vqdMatch = Regex("""vqd=["']?([0-9-]+)["']?""").find(html)
+                    val extracted = vqdMatch?.groupValues?.getOrNull(1)
+                    if (extracted.isNullOrEmpty()) {
+                        return LoadResult.Error(Exception("VQD não encontrado"))
+                    }
+                    extracted.also { cachedVqd = it }
+                } catch (e: Exception) {
+                    return LoadResult.Error(e)
+                }
             }
 
             val json = api.getImagesJson(query, vqd, position)
@@ -33,10 +38,9 @@ class SearchPagingSource(
             LoadResult.Page(
                 data = items,
                 prevKey = if (position == 0) null else position,
-                nextKey = nextS  // usa o skip que o DDG mandou
+                nextKey = nextS
             )
         } catch (e: Exception) {
-            android.util.Log.e("SearchPagingSource", "Erro: ${e.message}")
             LoadResult.Error(e)
         }
     }
@@ -47,7 +51,6 @@ class SearchPagingSource(
         return try {
             val jsonObject = jsonParser.parseToJsonElement(jsonString).jsonObject
 
-            // Extrai o próximo skip da URL "next"
             val nextUrl = jsonObject["next"]?.jsonPrimitive?.content
             val nextS = nextUrl?.let {
                 Regex("""s=(\d+)""").find(it)?.groupValues?.getOrNull(1)?.toIntOrNull()

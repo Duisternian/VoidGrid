@@ -8,9 +8,7 @@ interface GoogleSearchApi {
     suspend fun getVqdToken(
         @Query("q") query: String,
         @Query("ia") ia: String = "images",
-        @Query("iax") iax: String = "images",
-        @Query("t") t: String = "h_",
-        @Query("chip-select") chipSelect: String = "search"
+        @Query("iax") iax: String = "images"
     ): String
 
     @GET("i.js")
@@ -19,8 +17,8 @@ interface GoogleSearchApi {
         @Query("vqd") vqd: String,
         @Query("s") skip: Int = 0,
         @Query("o") format: String = "json",
-        @Query("p") safeSearch: String = "-2",  // kp, não p
+        @Query("p") safeSearch: String = "-1",  // -1 = off, não -2
         @Query("f") filters: String = ",,,,,",
-        @Query("l") region: String = "us-en"     // us-en, não wt-wt
+        @Query("l") region: String = "wt-wt"
     ): String
 }

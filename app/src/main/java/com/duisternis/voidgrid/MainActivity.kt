@@ -7,6 +7,10 @@ import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import android.provider.MediaStore
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -59,28 +63,28 @@ import java.io.File
 import java.io.FileOutputStream
 
 class ImageSearchViewModel : ViewModel() {
-    private val _query = MutableStateFlow("")
+    private val _query = MutableStateFlow<String?>(null)
+    val currentQuery: StateFlow<String?> = _query.asStateFlow()
 
-    // Esta é a nova "fonte da verdade" que substitui o uiState
     @OptIn(ExperimentalCoroutinesApi::class)
-    val pagingDataFlow = _query.flatMapLatest { query ->
-        Pager(
-            config = PagingConfig(
-                pageSize = 20,
-                enablePlaceholders = false,
-                initialLoadSize = 20
-            ),
-            pagingSourceFactory = { SearchPagingSource(query, RetrofitClient.googleSearchApi) }
-        ).flow
-    }.cachedIn(viewModelScope)
+    val pagingDataFlow = _query
+        .filterNotNull()
+        .filter { it.isNotBlank() }
+        .flatMapLatest { query ->
+            Pager(
+                config = PagingConfig(
+                    pageSize = 35,
+                    enablePlaceholders = false,
+                    initialLoadSize = 35
+                ),
+                pagingSourceFactory = { SearchPagingSource(query, RetrofitClient.googleSearchApi) }
+            ).flow
+        }.cachedIn(viewModelScope)
 
-    // O método de busca agora apenas atualiza a query
     fun search(newQuery: String) {
         _query.value = newQuery
     }
 }
-
-
 
 class MainActivity : ComponentActivity() {
     private val viewModel: ImageSearchViewModel by viewModels()
@@ -93,13 +97,14 @@ class MainActivity : ComponentActivity() {
             ImageSearchTheme {
                 val imageLoader = remember { createCustomImageLoader(this) }
                 CompositionLocalProvider(LocalImageLoader provides imageLoader) {
-                    // Coleta o fluxo de PagingData do ViewModel
                     val pagingItems = viewModel.pagingDataFlow.collectAsLazyPagingItems()
+                    val currentQuery by viewModel.currentQuery.collectAsState()
 
                     ImageSearchScreen(
                         pagingItems = pagingItems,
                         onSearch = { viewModel.search(it) },
-                        imageLoader = imageLoader
+                        imageLoader = imageLoader,
+                        hasQuery = !currentQuery.isNullOrBlank()
                     )
                 }
             }
@@ -120,12 +125,15 @@ class MainActivity : ComponentActivity() {
                 val filename = "IMG_${System.currentTimeMillis()}.jpg"
                 val fos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, ContentValues().apply {
-                        put(MediaStore.Images.Media.DISPLAY_NAME, filename); put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                        put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
                     })?.let { contentResolver.openOutputStream(it) }
                 } else FileOutputStream(File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), filename))
                 fos?.use { bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it) }
                 withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, "Salvo!", Toast.LENGTH_SHORT).show() }
-            } catch (_: Exception) { withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, "Erro", Toast.LENGTH_SHORT).show() } }
+            } catch (_: Exception) {
+                withContext(Dispatchers.Main) { Toast.makeText(this@MainActivity, "Erro", Toast.LENGTH_SHORT).show() }
+            }
         }
     }
 }
@@ -135,7 +143,8 @@ class MainActivity : ComponentActivity() {
 fun ImageSearchScreen(
     pagingItems: androidx.paging.compose.LazyPagingItems<SearchItem>,
     onSearch: (String) -> Unit,
-    imageLoader: ImageLoader
+    imageLoader: ImageLoader,
+    hasQuery: Boolean
 ) {
     var query by remember { mutableStateOf("") }
     var selectedItem by remember { mutableStateOf<SearchItem?>(null) }
@@ -152,18 +161,14 @@ fun ImageSearchScreen(
             items(count = pagingItems.itemCount) { index ->
                 val item = pagingItems[index]
                 if (item != null) {
-
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { focusManager.clearFocus(); selectedItem = item }
-                            .animateItem(
-                                placementSpec = tween(durationMillis = 700) // 1000ms = 1 segundo de deslize
-                            )
+                            .animateItem(placementSpec = tween(durationMillis = 800))
                     ) {
-
                         AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current).data(item.link).crossfade(0).build(),
+                            model = ImageRequest.Builder(LocalContext.current).data(item.link).crossfade(500).build(),
                             imageLoader = imageLoader,
                             contentDescription = null,
                             contentScale = ContentScale.FillWidth,
@@ -175,23 +180,20 @@ fun ImageSearchScreen(
         }
 
         Column(modifier = Modifier.fillMaxWidth()) {
-            // 1. O Spacer cuida exclusivamente da área da barra de status (cor preta)
             Spacer(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color.Black)
                     .statusBarsPadding()
-
             )
 
-            // 2. A SearchBar com o padding de 6.dp para não ficar colada na câmera
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 9.dp)
-                    .padding(top = 10.dp), // Separar os paddings evita erros de sintaxe
+                    .padding(top = 10.dp),
                 placeholder = { Text("Pesquisar...") },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray) },
                 singleLine = true,
@@ -206,10 +208,11 @@ fun ImageSearchScreen(
                 shape = RoundedCornerShape(25.dp)
             )
 
-            // Agora o loadState é calculado dentro do escopo do Composable
             val loadState = pagingItems.loadState
-            val isLoading = loadState.source.refresh is androidx.paging.LoadState.Loading ||
-                    loadState.append is androidx.paging.LoadState.Loading
+            val isLoading = hasQuery && (
+                    loadState.source.refresh is LoadState.Loading ||
+                            loadState.append is LoadState.Loading
+                    )
 
             AnimatedVisibility(
                 visible = isLoading,
@@ -229,12 +232,13 @@ fun ImageSearchScreen(
                     )
                 }
             }
-            }
-}
+        }
+    }
+
     selectedItem?.let { item ->
         ImageDetailDialog(
             item = item,
-            allImages = pagingItems.itemSnapshotList.items.filterNotNull(),
+            allImages = pagingItems.itemSnapshotList.items,
             onDismiss = { selectedItem = null },
             activity = LocalContext.current as MainActivity,
             imageLoader = imageLoader
@@ -271,10 +275,27 @@ fun ImageDetailDialog(
                 item(span = StaggeredGridItemSpan.FullLine) {
                     Column {
                         IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, null, tint = Color.White) }
-                        AsyncImage(model = currentItem.link, imageLoader = imageLoader, contentDescription = null, modifier = Modifier.fillMaxWidth().wrapContentHeight(), contentScale = ContentScale.FillWidth)
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            Button(onClick = { activity.shareImage(currentItem.link) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF191919), contentColor = Color.White), shape = RoundedCornerShape(12.dp)) { Text("Compartilhar") }
-                            Button(onClick = { activity.downloadImage(currentItem.link) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF191919), contentColor = Color.White), shape = RoundedCornerShape(12.dp)) { Text("Baixar") }
+                        AsyncImage(
+                            model = currentItem.link,
+                            imageLoader = imageLoader,
+                            contentDescription = null,
+                            modifier = Modifier.fillMaxWidth().wrapContentHeight(),
+                            contentScale = ContentScale.FillWidth
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            Button(
+                                onClick = { activity.shareImage(currentItem.link) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF191919), contentColor = Color.White),
+                                shape = RoundedCornerShape(12.dp)
+                            ) { Text("Compartilhar") }
+                            Button(
+                                onClick = { activity.downloadImage(currentItem.link) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF191919), contentColor = Color.White),
+                                shape = RoundedCornerShape(12.dp)
+                            ) { Text("Baixar") }
                         }
                     }
                 }
@@ -283,7 +304,11 @@ fun ImageDetailDialog(
                         model = ImageRequest.Builder(LocalContext.current).data(similar.link).build(),
                         imageLoader = imageLoader,
                         contentDescription = null,
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { currentItem = similar }.background(Color.DarkGray),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { currentItem = similar }
+                            .background(Color.DarkGray),
                         contentScale = ContentScale.FillWidth
                     )
                 }

@@ -6,7 +6,6 @@ import retrofit2.Retrofit
 import retrofit2.converter.scalars.ScalarsConverterFactory
 
 object RetrofitClient {
-    private const val BASE_URL = "https://duckduckgo.com/"
 
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
@@ -15,20 +14,27 @@ object RetrofitClient {
                 .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                 .header("Accept-Language", "en-US,en;q=0.5")
                 .header("Referer", "https://duckduckgo.com/")
-                .header("Cookie", "p=-2; kl=us-en; kp=-2")   // kp=-2 é o safe search off
+                .header("Cookie", "p=-1; kl=wt-wt")
                 .build()
             chain.proceed(request)
         }
-        .addInterceptor(
-            HttpLoggingInterceptor().apply {
-                level = HttpLoggingInterceptor.Level.HEADERS // ver headers no Logcat
-            }
-        )
+        .addInterceptor(HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.HEADERS
+        })
         .build()
+
+    val htmlApi: GoogleSearchApi by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://duckduckgo.com/")
+            .client(okHttpClient)
+            .addConverterFactory(ScalarsConverterFactory.create())
+            .build()
+            .create(GoogleSearchApi::class.java)
+    }
 
     val googleSearchApi: GoogleSearchApi by lazy {
         Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl("https://duckduckgo.com/")
             .client(okHttpClient)
             .addConverterFactory(ScalarsConverterFactory.create())
             .build()

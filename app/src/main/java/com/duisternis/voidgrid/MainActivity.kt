@@ -52,6 +52,11 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import coil.size.Precision
+import com.duisternis.voidgrid.data.api.RetrofitClient
+import com.duisternis.voidgrid.data.api.SearchPagingSource
+import com.duisternis.voidgrid.data.model.SearchItem
+import com.duisternis.voidgrid.data.util.LocalImageLoader
+import com.duisternis.voidgrid.data.util.createCustomImageLoader
 import com.duisternis.voidgrid.ui.theme.ImageSearchTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -254,7 +259,7 @@ fun ImageDetailDialog(item: SearchItem, allImages: List<SearchItem>, onDismiss: 
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
             LazyVerticalStaggeredGrid(
                 columns = StaggeredGridCells.Fixed(2),
-                // AQUI: Reduzimos o top para o padrão, o espaçamento será feito dentro do item
+                // AQUI: Reduzimos o ‘top’ para o padrão, o espaçamento será feito dentro do ‘item’
                 contentPadding = PaddingValues(top = 12.dp, start = 8.dp, end = 8.dp, bottom = 8.dp),
                 verticalItemSpacing = 8.dp,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -293,7 +298,7 @@ fun ImageDetailDialog(item: SearchItem, allImages: List<SearchItem>, onDismiss: 
                             val actionItems = listOf(
                                 Triple("Compartilhar", R.drawable.ios_share_24) { activity.shareImage(currentItem.link) },
                                 Triple("Baixar", R.drawable.download_24) { activity.downloadImage(currentItem.link) },
-                                Triple("Favoritar", R.drawable.ic_favorite_24) { /* Lógica */ },
+                                Triple("Favorite", R.drawable.ic_favorite_24) { /* Lógica */ },
                                 Triple("Abrir", R.drawable.ic_open_in_browser_24) { /* Lógica */ }
                             )
 
@@ -312,7 +317,7 @@ fun ImageDetailDialog(item: SearchItem, allImages: List<SearchItem>, onDismiss: 
 
                 // Grid de sugestões
                 items(items = suggestedItems, key = { "${it.link}_${it.source}" }) { similar ->
-                    // ... (seu código permanece igual)
+                    // ...(o seu código permanece igual)
                     var simLoaded by remember(similar.link) { mutableStateOf(false) }
                     Box(modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { currentItem = similar }) {
                         if (!simLoaded) ShimmerBox(modifier = Modifier.fillMaxWidth().height(120.dp))

@@ -1,13 +1,12 @@
-package com.duisternis.voidgrid
+package com.duisternis.voidgrid.data.api
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
+import com.duisternis.voidgrid.data.model.SearchItem
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-
-// ─── PagingSource para busca de imagens ──────────────────────────────────────
 
 class SearchPagingSource(
     private val query: String,

@@ -1,4 +1,5 @@
-package com.duisternis.voidgrid
+package com.duisternis.voidgrid.data.model
+
 data class SearchItem
     (val link: String,
     val source: String,

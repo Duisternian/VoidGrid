@@ -1,4 +1,4 @@
-package com.duisternis.voidgrid
+package com.duisternis.voidgrid.data.api
 
 import retrofit2.http.GET
 import retrofit2.http.Query

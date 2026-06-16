@@ -1,4 +1,4 @@
-package com.duisternis.voidgrid
+package com.duisternis.voidgrid.data.util
 
 import android.content.Context
 import androidx.compose.runtime.staticCompositionLocalOf

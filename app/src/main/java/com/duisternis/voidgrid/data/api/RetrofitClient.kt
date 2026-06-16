@@ -1,11 +1,9 @@
-package com.duisternis.voidgrid
+package com.duisternis.voidgrid.data.api
 
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.scalars.ScalarsConverterFactory
 import java.util.concurrent.TimeUnit
-
-// ─── Configuração do Cliente HTTP ───────────────────────────────────────────
 
 object RetrofitClient {
 

@@ -7,27 +7,23 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
+// ─── PagingSource para busca de imagens ──────────────────────────────────────
+
 class SearchPagingSource(
     private val query: String,
-    private val api: GoogleSearchApi,
-    private val tokenCache: TokenCache
+    private val api: GoogleSearchApi
 ) : PagingSource<Int, SearchItem>() {
 
     private val jsonParser = Json { ignoreUnknownKeys = true }
     private var cachedVqd: String? = null
 
+    // ─── Carregamento de dados ────────────────────────────────────────────────
+
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SearchItem> {
         val position = params.key ?: 0
+
         return try {
-            val vqd = cachedVqd ?: run {
-                try {
-                    tokenCache.getOrFetch(query) {
-                        RetrofitClient.htmlApi.getVqdToken(query)
-                    }.also { cachedVqd = it }
-                } catch (e: Exception) {
-                    return LoadResult.Error(e)
-                }
-            }
+            val vqd = cachedVqd ?: fetchVqdToken() ?: return LoadResult.Error(Exception("Token VQD indisponível"))
 
             val json = api.getImagesJson(query, vqd, position)
             val (items, nextS) = parseDuckDuckGoJson(json)
@@ -42,27 +38,39 @@ class SearchPagingSource(
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, SearchItem>): Int? = null
+    private suspend fun fetchVqdToken(): String? = try {
+        val html = RetrofitClient.duckDuckGoApi.getVqdToken(query)
+        val extracted = """vqd=["']?([0-9-]+)["']?""".toRegex().find(html)?.groupValues?.getOrNull(1)
+        cachedVqd = extracted
+        extracted
+    } catch (_: Exception) {
+        null
+    }
+
+    override fun getRefreshKey(state: PagingState<Int, SearchItem>): Int? = state.anchorPosition
+
+    // ─── Processamento JSON ───────────────────────────────────────────────────
 
     private fun parseDuckDuckGoJson(jsonString: String): Pair<List<SearchItem>, Int?> {
         return try {
-            val jsonObject = jsonParser.parseToJsonElement(jsonString).jsonObject
+            val root = jsonParser.parseToJsonElement(jsonString).jsonObject
 
-            val nextUrl = jsonObject["next"]?.jsonPrimitive?.content
-            val nextS = nextUrl?.let {
-                Regex("""s=(\d+)""").find(it)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            val nextS = root["next"]?.jsonPrimitive?.content?.let { url ->
+                Regex("""s=(\d+)""").find(url)?.groupValues?.getOrNull(1)?.toIntOrNull()
             }
 
-            val resultsArray = jsonObject["results"]?.jsonArray ?: return Pair(emptyList(), null)
-            val items = resultsArray.mapNotNull { element ->
+            val items = root["results"]?.jsonArray?.mapNotNull { element ->
                 val obj = element.jsonObject
                 val link = obj["image"]?.jsonPrimitive?.content ?: return@mapNotNull null
                 val source = obj["source"]?.jsonPrimitive?.content?.lowercase() ?: "unknown"
-                SearchItem(link, source)
-            }.filter { it.link.startsWith("http") }
+                val width = obj["width"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                val height = obj["height"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+
+                if (link.startsWith("http")) SearchItem(link, source, width, height) else null
+            } ?: emptyList()
 
             Pair(items, nextS)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Pair(emptyList(), null)
         }
     }

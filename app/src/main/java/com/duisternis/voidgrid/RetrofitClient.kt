@@ -1,38 +1,30 @@
 package com.duisternis.voidgrid
 
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.scalars.ScalarsConverterFactory
+import java.util.concurrent.TimeUnit
+
+// ─── Configuração do Cliente HTTP ───────────────────────────────────────────
 
 object RetrofitClient {
 
     private val okHttpClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(15, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(true)
         .addInterceptor { chain ->
             val request = chain.request().newBuilder()
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0")
-                .header("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-                .header("Accept-Language", "en-US,en;q=0.5")
-                .header("Referer", "https://duckduckgo.com/")
-                .header("Cookie", "p=-1; kl=wt-wt")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+                .header("Accept", "application/json, text/javascript, */*; q=0.01")
                 .build()
             chain.proceed(request)
         }
-        .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.HEADERS
-        })
         .build()
 
-    val htmlApi: GoogleSearchApi by lazy {
-        Retrofit.Builder()
-            .baseUrl("https://duckduckgo.com/")
-            .client(okHttpClient)
-            .addConverterFactory(ScalarsConverterFactory.create())
-            .build()
-            .create(GoogleSearchApi::class.java)
-    }
+    // ─── Instância da API ────────────────────────────────────────────────────
 
-    val googleSearchApi: GoogleSearchApi by lazy {
+    val duckDuckGoApi: GoogleSearchApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://duckduckgo.com/")
             .client(okHttpClient)

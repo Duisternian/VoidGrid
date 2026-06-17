@@ -2,10 +2,7 @@ package com.duisternis.voidgrid.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.paging.Pager
-import androidx.paging.PagingConfig
 import androidx.paging.cachedIn
-import com.duisternis.voidgrid.data.api.SearchPagingSource
 import com.duisternis.voidgrid.data.repository.ImageSearchRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+
+// ─── ViewModel de busca de imagens ───────────────────────────────────────────
 
 class ImageSearchViewModel(
     private val repository: ImageSearchRepository
@@ -26,13 +25,7 @@ class ImageSearchViewModel(
     val pagingDataFlow = _query
         .filterNotNull()
         .filter { it.isNotBlank() }
-        .flatMapLatest { query ->
-            // Agora criamos o Pager aqui no ViewModel, injetando o repositório no PagingSource
-            Pager(
-                config = PagingConfig(pageSize = 20, enablePlaceholders = false),
-                pagingSourceFactory = { SearchPagingSource(repository, query) }
-            ).flow
-        }
+        .flatMapLatest { repository.searchImages(it) }
         .cachedIn(viewModelScope)
 
     fun search(newQuery: String) {

@@ -1,6 +1,5 @@
 package com.duisternis.voidgrid.data.parser
 
-import android.util.Log
 import com.duisternis.voidgrid.data.model.SearchItem
 import kotlinx.serialization.json.*
 
@@ -24,8 +23,17 @@ class SearchParser {
             } ?: emptyList()
             Pair(items, nextS)
         } catch (e: Exception) {
-            Log.e("SearchParser", "Erro ao parsear JSON — primeiros 200 chars: ${jsonString.take(200)}", e)
+            logger("Erro ao parsear JSON — primeiros 200 chars: ${jsonString.take(200)}\n${e.message}")
             Pair(emptyList(), null)
+        }
+    }
+
+    // Usa android.util.Log em runtime, println em testes (onde o Android framework não existe)
+    private fun logger(message: String) {
+        try {
+            android.util.Log.e("SearchParser", message)
+        } catch (_: RuntimeException) {
+            println("[SearchParser] $message")
         }
     }
 }

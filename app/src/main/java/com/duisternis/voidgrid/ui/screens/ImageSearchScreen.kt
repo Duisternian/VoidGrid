@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -46,38 +47,67 @@ fun ImageSearchScreen(
     var query by remember { mutableStateOf("") }
     var selectedItem by remember { mutableStateOf<SearchItem?>(null) }
     val focusManager = LocalFocusManager.current
+    val gridState = rememberLazyStaggeredGridState()
+
+    // Sets persistentes — uma vez carregada/erro, a imagem não reseta
+    var loadedKeys by remember { mutableStateOf(setOf<String>()) }
+    var errorKeys by remember { mutableStateOf(setOf<String>()) }
+
+    // Limpa os sets e volta ao topo quando uma nova busca começa
+    LaunchedEffect(hasQuery, pagingItems.loadState.source.refresh) {
+        val isNewSearch = pagingItems.loadState.source.refresh is LoadState.Loading && hasQuery
+        if (isNewSearch) {
+            loadedKeys = setOf()
+            errorKeys = setOf()
+            gridState.scrollToItem(0)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyVerticalStaggeredGrid(
+            state = gridState,
             columns = StaggeredGridCells.Fixed(2),
-            contentPadding = PaddingValues(top = 135.dp, start = 8.dp, end = 8.dp, bottom = 8.dp),
+            contentPadding = PaddingValues(top = 113.dp, start = 8.dp, end = 8.dp, bottom = 8.dp),
             verticalItemSpacing = 8.dp,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxSize()
         ) {
             items(
                 count = pagingItems.itemCount,
-                key = { index -> "${pagingItems.peek(index)?.link}_$index" }
+                key = { index -> index }
             ) { index ->
                 val item = pagingItems[index] ?: return@items
-                var isError by remember(item.link) { mutableStateOf(false) }
-                var isLoaded by remember(item.link) { mutableStateOf(false) }
+                val isError = item.link in errorKeys
+                val isLoaded = item.link in loadedKeys
 
                 if (!isError) {
-                    val aspectRatio = if (item.width > 0 && item.height > 0) item.width.toFloat() / item.height.toFloat() else 0.75f
-                    Card(modifier = Modifier.fillMaxWidth().clickable { focusManager.clearFocus(); selectedItem = item }) {
+                    val aspectRatio = if (item.width > 0 && item.height > 0)
+                        item.width.toFloat() / item.height.toFloat()
+                    else 0.75f
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                focusManager.clearFocus()
+                                selectedItem = item
+                            }
+                    ) {
                         Box(modifier = Modifier.fillMaxWidth().aspectRatio(aspectRatio)) {
                             if (!isLoaded) ShimmerBox(modifier = Modifier.fillMaxSize())
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    .data(item.link.replace(" ", "%20")).crossfade(100)
-                                    .diskCachePolicy(CachePolicy.ENABLED).memoryCachePolicy(CachePolicy.ENABLED)
-                                    .precision(Precision.INEXACT).build(),
+                                    .data(item.link.replace(" ", "%20"))
+                                    .crossfade(100)
+                                    .diskCachePolicy(CachePolicy.ENABLED)
+                                    .memoryCachePolicy(CachePolicy.ENABLED)
+                                    .precision(Precision.INEXACT)
+                                    .build(),
                                 imageLoader = imageLoader,
                                 contentDescription = null,
                                 contentScale = ContentScale.FillWidth,
-                                onSuccess = { isLoaded = true },
-                                onError = { isError = true },
+                                onSuccess = { loadedKeys = loadedKeys + item.link },
+                                onError = { errorKeys = errorKeys + item.link },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -90,22 +120,32 @@ fun ImageSearchScreen(
         Column(modifier = Modifier.fillMaxWidth()) {
             Spacer(modifier = Modifier.fillMaxWidth().background(Color.Black).statusBarsPadding())
             OutlinedTextField(
-                value = query, onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 10.dp),
+                value = query,
+                onValueChange = { query = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 9.dp, vertical = 7.dp),
                 placeholder = { Text("Pesquisar...") },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onSearch(query); focusManager.clearFocus() }),
+                keyboardActions = KeyboardActions(onSearch = {
+                    onSearch(query)
+                    focusManager.clearFocus()
+                }),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFF191919), unfocusedContainerColor = Color(0xFF191919),
-                    focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent
+                    focusedContainerColor = Color(0xFF191919),
+                    unfocusedContainerColor = Color(0xFF191919),
+                    focusedBorderColor = Color.Transparent,
+                    unfocusedBorderColor = Color.Transparent
                 ),
                 shape = RoundedCornerShape(25.dp)
             )
 
-            // Loading posicionado logo abaixo do TextField
-            val isLoading = hasQuery && (pagingItems.loadState.source.refresh is LoadState.Loading || pagingItems.loadState.append is LoadState.Loading)
+            val isLoading = hasQuery && (
+                    pagingItems.loadState.source.refresh is LoadState.Loading ||
+                            pagingItems.loadState.append is LoadState.Loading
+                    )
             AnimatedVisibility(
                 visible = isLoading,
                 enter = fadeIn(tween(500)),
@@ -113,7 +153,9 @@ fun ImageSearchScreen(
             ) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     LinearProgressIndicator(
-                        modifier = Modifier.fillMaxWidth(0.9f).padding(bottom = 5.dp),
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .padding(bottom = 5.dp),
                         color = Color.White.copy(alpha = 0.8f),
                         trackColor = Color.Transparent
                     )
@@ -122,7 +164,12 @@ fun ImageSearchScreen(
         }
 
         selectedItem?.let { item ->
-            ImageDetailDialog(item, pagingItems.itemSnapshotList.items, { selectedItem = null }, imageLoader)
+            ImageDetailDialog(
+                item = item,
+                allImages = pagingItems.itemSnapshotList.items,
+                onDismiss = { selectedItem = null },
+                imageLoader = imageLoader
+            )
         }
     }
 }

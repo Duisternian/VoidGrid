@@ -8,7 +8,6 @@ import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import android.widget.Toast
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -17,7 +16,6 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 
-// ADICIONE ESTA LINHA AQUI:
 object DownloadUtils {
 
     fun shareImage(context: Context, url: String) {
@@ -28,32 +26,45 @@ object DownloadUtils {
         context.startActivity(Intent.createChooser(intent, "Compartilhar"))
     }
 
-    suspend fun downloadImage(context: Context, imageUrl: String, imageLoader: ImageLoader) {
-        withContext(Dispatchers.IO) {
-            try {
-                val result = (imageLoader.execute(ImageRequest.Builder(context).data(imageUrl).build()) as SuccessResult).drawable
-                val bitmap = (result as BitmapDrawable).bitmap
-                val filename = "IMG_${System.currentTimeMillis()}.jpg"
+    suspend fun downloadImage(
+        context: Context,
+        imageUrl: String,
+        imageLoader: ImageLoader
+    ): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val result = imageLoader.execute(
+                ImageRequest.Builder(context).data(imageUrl).build()
+            ) as? SuccessResult ?: error("Falha ao carregar imagem")
 
-                val fos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, ContentValues().apply {
-                        put(MediaStore.Images.Media.DISPLAY_NAME, filename)
-                        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-                    })?.let { context.contentResolver.openOutputStream(it) }
-                } else {
-                    @Suppress("DEPRECATION")
-                    FileOutputStream(File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), filename))
-                }
-                fos?.use { bitmap.compress(Bitmap.CompressFormat.JPEG, 100, it) }
+            val bitmap = (result.drawable as? BitmapDrawable)?.bitmap
+                ?: error("Drawable não é um BitmapDrawable")
 
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Salvo!", Toast.LENGTH_SHORT).show()
+            val filename = "IMG_${System.currentTimeMillis()}.jpg"
+
+            val outputStream = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val contentValues = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES)
                 }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Erro ao salvar", Toast.LENGTH_SHORT).show()
-                }
+                val uri = context.contentResolver.insert(
+                    MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues
+                ) ?: error("Falha ao criar URI no MediaStore")
+                context.contentResolver.openOutputStream(uri)
+            } else {
+                @Suppress("DEPRECATION")
+                FileOutputStream(
+                    File(
+                        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                        filename
+                    )
+                )
             }
+
+            outputStream?.use { bitmap.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+                ?: error("OutputStream nulo")
+
+            filename
         }
     }
-} // E FECHE A CHAVE AQUI NO FINAL
+}

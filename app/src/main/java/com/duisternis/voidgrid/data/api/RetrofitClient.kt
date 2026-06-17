@@ -22,12 +22,12 @@ object RetrofitClient {
 
     // ─── Instância da API ────────────────────────────────────────────────────
 
-    val duckDuckGoApi: GoogleSearchApi by lazy {
+    val duckDuckGoApi: DuckDuckGoApi by lazy {
         Retrofit.Builder()
             .baseUrl("https://duckduckgo.com/")
             .client(okHttpClient)
             .addConverterFactory(ScalarsConverterFactory.create())
             .build()
-            .create(GoogleSearchApi::class.java)
+            .create(DuckDuckGoApi::class.java)
     }
 }

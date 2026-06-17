@@ -5,7 +5,7 @@ import retrofit2.http.Query
 
 // ─── Interface da API DuckDuckGo ─────────────────────────────────────────────
 
-interface GoogleSearchApi {
+interface DuckDuckGoApi {
 
     /**
      * Busca o ‘token’ VQD inicial necessário para realizar a pesquisa de imagens.

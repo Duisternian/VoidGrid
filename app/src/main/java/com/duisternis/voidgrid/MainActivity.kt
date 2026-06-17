@@ -5,7 +5,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -16,12 +15,13 @@ import com.duisternis.voidgrid.data.util.createCustomImageLoader
 import com.duisternis.voidgrid.ui.screens.ImageSearchScreen
 import com.duisternis.voidgrid.ui.theme.ImageSearchTheme
 import com.duisternis.voidgrid.ui.viewmodel.ImageSearchViewModel
+import org.koin.androidx.viewmodel.ext.android.viewModel
 
 // ─── MainActivity ────────────────────────────────────────────────────────────
 class MainActivity : ComponentActivity() {
 
-    // ViewModel associado a esta Activity
-    private val viewModel: ImageSearchViewModel by viewModels()
+    // Koin gerencia a injeção do ViewModel que, por sua vez, recebe o repositório
+    private val viewModel: ImageSearchViewModel by viewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
                 val imageLoader = remember { createCustomImageLoader(this) }
 
                 CompositionLocalProvider(LocalImageLoader provides imageLoader) {
-                    // Estados do Paging e Query
+                    // Estados do Paging e Query vindo do ViewModel injetado pelo Koin
                     val pagingItems = viewModel.pagingDataFlow.collectAsLazyPagingItems()
                     val currentQuery by viewModel.currentQuery.collectAsState()
 

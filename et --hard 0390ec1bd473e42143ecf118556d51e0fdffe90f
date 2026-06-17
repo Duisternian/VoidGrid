@@ -1,0 +1,83 @@
+[33mcommit 84ffc31ced357618832668d96ee304266b0f55e0[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Tue Jun 16 19:42:09 2026 -0300
+
+     otimizações para o ponto de partida real
+
+[33mcommit 0390ec1bd473e42143ecf118556d51e0fdffe90f[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Tue Jun 16 14:09:07 2026 -0300
+
+    Refatoração, Organização de Pastas e Separação de Arquivos
+
+[33mcommit db1c5cc3c4f2233ad1f74786910d405c645bd85c[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Tue Jun 16 13:59:50 2026 -0300
+
+    Refatorção,Organização de Pastas e Separação de Arquivos
+
+[33mcommit d4fa1a3f7d7f9d23786e196c81d97a6a41361663[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Tue Jun 16 13:02:29 2026 -0300
+
+    Refatora estrutura de pastas e organiza arquitetura do projeto
+
+[33mcommit b35acd4abb07c5a543e81a8ea089b406d1b6fa56[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Tue Jun 16 00:05:22 2026 -0300
+
+    Commit inicial do projeto VoidGrid
+
+[33mcommit 896b2e781deec4e02c7b0ccc164eff4c7b3250ad[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Mon Jun 15 14:07:47 2026 -0300
+
+    sua mensagem de commit
+
+[33mcommit edd29dd50d51c7567d660428ac41ca8a31452688[m[33m ([m[1;31morigin/versao-estavel-8905[m[33m, [m[1;32mversao-estavel-8905[m[33m)[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Mon Jun 15 13:46:51 2026 -0300
+
+    Salvando ponto de restauração em 8905ad9
+
+[33mcommit 8905ad9212c27195c6f6d329f30a7aabefa55033[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Mon Jun 15 05:57:43 2026 -0300
+
+    Descrição do que você mudou
+
+[33mcommit 9729925437339bb73593c181bd2cad244d700ac8[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Mon Jun 15 03:12:38 2026 -0300
+
+    Otimização
+
+[33mcommit 9a099a2e1459a48041d7ccc211b8a6ea7ea3e0b0[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Sun Jun 14 03:14:21 2026 -0300
+
+    Versão 0.0.2 - Adição de botões, busca flutuante e correções de UI
+
+[33mcommit c8cbcfe5ab50ad0e3ba91c89b083777519d00efd[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Sat Jun 13 02:26:42 2026 -0300
+
+    Otimiza Grid: limita a 40 itens, fixa aspecto e estabiliza scroll
+
+[33mcommit 4273166082b0186183e4f65b0a61c5e7d47ccb7d[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Sat Jun 13 01:56:29 2026 -0300
+
+    Otimiza Grid: limita a 40 itens, fixa aspecto e estabiliza scroll
+
+[33mcommit c5bd61ec0308e95e2e68de5d8a3db1f4c9179533[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Sat Jun 13 01:49:10 2026 -0300
+
+    Otimiza Grid: limita a 40 itens, fixa aspecto e estabiliza scroll
+
+[33mcommit 4a3f5b9ba56e8d7d9b1cf9dd2d701ca33ff610ea[m
+Author: Duisternian <jabbaduisternis@gmail.com>
+Date:   Sat Jun 13 00:05:49 2026 -0300
+
+    v1.0.0 - Feed infinito VoidGrid com busca inteligente

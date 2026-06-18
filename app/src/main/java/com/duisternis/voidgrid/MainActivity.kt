@@ -20,7 +20,7 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
 // ─── MainActivity ────────────────────────────────────────────────────────────
 class MainActivity : ComponentActivity() {
 
-    // Koin gerencia a injeção do ViewModel que, por sua vez, recebe o repositório
+    // KOIN gerencia a injeção do ViewModel que, por sua vez, recebe o repositório
     private val viewModel: ImageSearchViewModel by viewModel()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
                 val imageLoader = remember { createCustomImageLoader(this) }
 
                 CompositionLocalProvider(LocalImageLoader provides imageLoader) {
-                    // Estados do Paging e Query vindo do ViewModel injetado pelo Koin
+                    // Estados do Paging e Query vindo do ViewModel injetado pelo KOIN
                     val pagingItems = viewModel.pagingDataFlow.collectAsLazyPagingItems()
                     val currentQuery by viewModel.currentQuery.collectAsState()
 

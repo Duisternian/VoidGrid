@@ -18,8 +18,10 @@ class SearchParser {
                 val source = obj["source"]?.jsonPrimitive?.content?.lowercase() ?: "unknown"
                 val width = obj["width"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
                 val height = obj["height"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
+                val thumbnail = obj["thumbnail"]?.jsonPrimitive?.content
+                    ?.takeIf { it.startsWith("http") }
 
-                if (link.startsWith("http")) SearchItem(link, source, width, height) else null
+                if (link.startsWith("http")) SearchItem(link, source, width, height, thumbnail) else null
             } ?: emptyList()
             Pair(items, nextS)
         } catch (e: Exception) {
@@ -28,7 +30,6 @@ class SearchParser {
         }
     }
 
-    // Usa android.util.Log em runtime, println em testes (onde o Android framework não existe)
     private fun logger(message: String) {
         try {
             android.util.Log.e("SearchParser", message)

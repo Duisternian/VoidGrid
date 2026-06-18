@@ -1,7 +1,9 @@
 package com.duisternis.voidgrid.data.model
 
-data class SearchItem
-    (val link: String,
+data class SearchItem(
+    val link: String,
     val source: String,
     val width: Int = 0,
-    val height: Int = 0)
+    val height: Int = 0,
+    val thumbnail: String? = null
+)

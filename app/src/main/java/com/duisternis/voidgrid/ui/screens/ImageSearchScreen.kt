@@ -34,7 +34,9 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Precision
 import com.duisternis.voidgrid.data.model.SearchItem
-import com.duisternis.voidgrid.ui.components.ShimmerBox
+import com.duisternis.voidgrid.ui.components.DominantColorBox
+import com.duisternis.voidgrid.ui.viewmodel.ImageSearchViewModel
+import org.koin.androidx.compose.koinViewModel
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -42,25 +44,21 @@ fun ImageSearchScreen(
     pagingItems: LazyPagingItems<SearchItem>,
     onSearch: (String) -> Unit,
     imageLoader: ImageLoader,
-    hasQuery: Boolean
+    hasQuery: Boolean,
+    viewModel: ImageSearchViewModel = koinViewModel()
 ) {
     var query by remember { mutableStateOf("") }
     var selectedItem by remember { mutableStateOf<SearchItem?>(null) }
     val focusManager = LocalFocusManager.current
     val gridState = rememberLazyStaggeredGridState()
+    val context = LocalContext.current
 
-    // Sets persistentes — uma vez carregada/erro, a imagem não reseta
-    var loadedKeys by remember { mutableStateOf(setOf<String>()) }
-    var errorKeys by remember { mutableStateOf(setOf<String>()) }
+    val loadedVersion = viewModel.loadedKeysVersion
+    val errorVersion = viewModel.errorKeysVersion
 
-    // Limpa os sets e volta ao topo quando uma nova busca começa
     LaunchedEffect(hasQuery, pagingItems.loadState.source.refresh) {
         val isNewSearch = pagingItems.loadState.source.refresh is LoadState.Loading && hasQuery
-        if (isNewSearch) {
-            loadedKeys = setOf()
-            errorKeys = setOf()
-            gridState.scrollToItem(0)
-        }
+        if (isNewSearch) gridState.scrollToItem(0)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -77,13 +75,28 @@ fun ImageSearchScreen(
                 key = { index -> index }
             ) { index ->
                 val item = pagingItems[index] ?: return@items
-                val isError = item.link in errorKeys
-                val isLoaded = item.link in loadedKeys
+
+                val isError = viewModel.isError(item.link)
+                val isLoaded = viewModel.isLoaded(item.link)
+
+                @Suppress("UNUSED_EXPRESSION")
+                loadedVersion + errorVersion
 
                 if (!isError) {
                     val aspectRatio = if (item.width > 0 && item.height > 0)
                         item.width.toFloat() / item.height.toFloat()
                     else 0.75f
+
+                    // ImageRequest cacheado — não recriado a cada recomposição
+                    val imageRequest = remember(item.link) {
+                        ImageRequest.Builder(context)
+                            .data(item.link.replace(" ", "%20"))
+                            .crossfade(300)
+                            .diskCachePolicy(CachePolicy.ENABLED)
+                            .memoryCachePolicy(CachePolicy.ENABLED)
+                            .precision(Precision.INEXACT)
+                            .build()
+                    }
 
                     Card(
                         modifier = Modifier
@@ -93,21 +106,18 @@ fun ImageSearchScreen(
                                 selectedItem = item
                             }
                     ) {
-                        Box(modifier = Modifier.fillMaxWidth().aspectRatio(aspectRatio)) {
-                            if (!isLoaded) ShimmerBox(modifier = Modifier.fillMaxSize())
+                        DominantColorBox(
+                            thumbnailUrl = item.thumbnail,
+                            imageLoader = imageLoader,
+                            modifier = Modifier.fillMaxWidth().aspectRatio(aspectRatio)
+                        ) {
                             AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(item.link.replace(" ", "%20"))
-                                    .crossfade(100)
-                                    .diskCachePolicy(CachePolicy.ENABLED)
-                                    .memoryCachePolicy(CachePolicy.ENABLED)
-                                    .precision(Precision.INEXACT)
-                                    .build(),
+                                model = imageRequest,
                                 imageLoader = imageLoader,
                                 contentDescription = null,
                                 contentScale = ContentScale.FillWidth,
-                                onSuccess = { loadedKeys = loadedKeys + item.link },
-                                onError = { errorKeys = errorKeys + item.link },
+                                onSuccess = { viewModel.markLoaded(item.link) },
+                                onError = { viewModel.markError(item.link) },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

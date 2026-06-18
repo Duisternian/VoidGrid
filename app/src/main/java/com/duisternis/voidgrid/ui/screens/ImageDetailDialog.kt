@@ -29,7 +29,7 @@ import coil.request.ImageRequest
 import com.duisternis.voidgrid.R
 import com.duisternis.voidgrid.data.model.SearchItem
 import com.duisternis.voidgrid.data.util.DownloadUtils
-import com.duisternis.voidgrid.ui.components.ShimmerBox
+import com.duisternis.voidgrid.ui.components.DominantColorBox
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -73,11 +73,12 @@ fun ImageDetailDialog(
                                 Icon(Icons.Default.Close, null, tint = Color.White)
                             }
 
-                            var mainLoaded by remember(currentItem.link) { mutableStateOf(false) }
-                            Box(modifier = Modifier.fillMaxWidth().wrapContentHeight()) {
-                                if (!mainLoaded) ShimmerBox(
-                                    modifier = Modifier.fillMaxWidth().height(300.dp)
-                                )
+                            // Imagem principal com DominantColorBox
+                            DominantColorBox(
+                                thumbnailUrl = currentItem.thumbnail,
+                                imageLoader = imageLoader,
+                                modifier = Modifier.fillMaxWidth().wrapContentHeight()
+                            ) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
                                         .data(currentItem.link.replace(" ", "%20"))
@@ -86,7 +87,6 @@ fun ImageDetailDialog(
                                     imageLoader = imageLoader,
                                     contentDescription = null,
                                     contentScale = ContentScale.FillWidth,
-                                    onSuccess = { mainLoaded = true },
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
@@ -146,17 +146,17 @@ fun ImageDetailDialog(
                         }
                     }
 
+                    // Imagens sugeridas com DominantColorBox
                     items(items = suggestedItems, key = { "${it.link}_${it.source}" }) { similar ->
-                        var simLoaded by remember(similar.link) { mutableStateOf(false) }
-                        Box(
+                        DominantColorBox(
+                            thumbnailUrl = similar.thumbnail,
+                            imageLoader = imageLoader,
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .height(120.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { currentItem = similar }
                         ) {
-                            if (!simLoaded) ShimmerBox(
-                                modifier = Modifier.fillMaxWidth().height(120.dp)
-                            )
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
                                     .data(similar.link.replace(" ", "%20"))
@@ -165,8 +165,7 @@ fun ImageDetailDialog(
                                 imageLoader = imageLoader,
                                 contentDescription = null,
                                 contentScale = ContentScale.FillWidth,
-                                onSuccess = { simLoaded = true },
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxSize()
                             )
                         }
                     }

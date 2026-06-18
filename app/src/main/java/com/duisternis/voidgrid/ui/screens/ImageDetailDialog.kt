@@ -70,7 +70,6 @@ fun ImageDetailDialog(
                     .fillMaxSize()
                     .background(Color.Black)
             ) {
-                // Fade do conteúdo inteiro ao trocar de imagem
                 AnimatedContent(
                     targetState = currentItem,
                     transitionSpec = {
@@ -101,24 +100,43 @@ fun ImageDetailDialog(
                                     Icon(Icons.Default.Close, null, tint = Color.White)
                                 }
 
-                                DominantColorBox(
-                                    thumbnailUrl = activeItem.encodedThumbnail,
-                                    imageLoader = imageLoader,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .wrapContentHeight()
-                                        .clip(RoundedCornerShape(12.dp))
-                                ) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(activeItem.encodedLink)
-                                            .crossfade(400)
-                                            .build(),
+                                val mainIsTransparent = viewModel.isTransparent(activeItem.link)
+                                var mainImageError by remember(activeItem.link) { mutableStateOf(false) }
+
+                                if (!mainImageError) {
+                                    DominantColorBox(
+                                        thumbnailUrl = if (mainIsTransparent) null else activeItem.encodedThumbnail,
                                         imageLoader = imageLoader,
-                                        contentDescription = null,
-                                        contentScale = ContentScale.FillWidth,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .wrapContentHeight()
+                                            .clip(RoundedCornerShape(12.dp))
+                                    ) {
+                                        AsyncImage(
+                                            model = ImageRequest.Builder(LocalContext.current)
+                                                .data(activeItem.encodedLink)
+                                                .crossfade(400)
+                                                .build(),
+                                            imageLoader = imageLoader,
+                                            contentDescription = null,
+                                            contentScale = ContentScale.FillWidth,
+                                            onError = { mainImageError = true },
+                                            onSuccess = { result ->
+                                                val hwBitmap = (result.result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                                                if (hwBitmap != null && hwBitmap.hasAlpha()) {
+                                                    val bitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                                                    if (bitmap != null) {
+                                                        val pixels = IntArray(bitmap.width * bitmap.height)
+                                                        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                                                        val transparentCount = pixels.count { (it ushr 24) and 0xFF < 200 }
+                                                        if (transparentCount > pixels.size * 0.05) viewModel.markTransparent(activeItem.link)
+                                                        bitmap.recycle()
+                                                    }
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                    }
                                 }
 
                                 Row(
@@ -184,9 +202,14 @@ fun ImageDetailDialog(
                         }
 
                         items(items = suggestedItems, key = { "${it.link}_${it.source}" }) { similar ->
+                            val isError = viewModel.isError(similar.link)
+                            if (isError) return@items
+
                             val aspectRatio = if (similar.width > 0 && similar.height > 0)
                                 similar.width.toFloat() / similar.height.toFloat()
                             else 0.75f
+
+                            val similarIsTransparent = viewModel.isTransparent(similar.link)
 
                             Box(
                                 modifier = Modifier
@@ -195,7 +218,7 @@ fun ImageDetailDialog(
                                     .clickable { currentItem = similar }
                             ) {
                                 DominantColorBox(
-                                    thumbnailUrl = similar.encodedThumbnail,
+                                    thumbnailUrl = if (similarIsTransparent) null else similar.encodedThumbnail,
                                     imageLoader = imageLoader,
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -209,6 +232,20 @@ fun ImageDetailDialog(
                                         imageLoader = imageLoader,
                                         contentDescription = null,
                                         contentScale = ContentScale.FillWidth,
+                                        onError = { viewModel.markError(similar.link) },
+                                        onSuccess = { result ->
+                                            val hwBitmap = (result.result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                                            if (hwBitmap != null && hwBitmap.hasAlpha()) {
+                                                val bitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                                                if (bitmap != null) {
+                                                    val pixels = IntArray(bitmap.width * bitmap.height)
+                                                    bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                                                    val transparentCount = pixels.count { (it ushr 24) and 0xFF < 200 }
+                                                    if (transparentCount > pixels.size * 0.05) viewModel.markTransparent(similar.link)
+                                                    bitmap.recycle()
+                                                }
+                                            }
+                                        },
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }

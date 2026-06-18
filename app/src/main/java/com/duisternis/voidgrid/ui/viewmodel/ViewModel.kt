@@ -1,7 +1,8 @@
 package com.duisternis.voidgrid.ui.viewmodel
 
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
@@ -31,30 +32,38 @@ class ImageSearchViewModel(
         .flatMapLatest { repository.searchImages(it) }
         .cachedIn(viewModelScope)
 
-    // Cache de cores reativo — mutableStateMapOf notifica o Compose quando atualiza
-    private val _colorCache = androidx.compose.runtime.mutableStateMapOf<String, Color>()
+    // Cache de cores reativo — notifica o Compose automaticamente quando atualiza
+    private val _colorCache = mutableStateMapOf<String, Color>()
     val colorCache: Map<String, Color> get() = _colorCache
 
     fun cacheColor(thumbnailUrl: String, color: Color) {
         _colorCache[thumbnailUrl] = color
     }
 
-    // Cache de sugestões fixas por link:
-    // - filtra o item original E deduplica por link antes de shufflar
-    // - garante que fechar/reabrir a dialog mostre sempre as mesmas sugestões
+    // Links de imagens com transparência detectada no onSuccess — sem gradiente
+    private val _transparentKeys = mutableStateMapOf<String, Boolean>()
+    val transparentKeys: Map<String, Boolean> get() = _transparentKeys
+
+    fun markTransparent(link: String) {
+        _transparentKeys[link] = true
+    }
+
+    fun isTransparent(link: String): Boolean = _transparentKeys[link] == true
+
+    // Cache de sugestões fixas por link
     private val _suggestionsCache = mutableMapOf<String, List<SearchItem>>()
 
     fun getSuggestions(link: String, allImages: List<SearchItem>): List<SearchItem> {
         return _suggestionsCache.getOrPut(link) {
             allImages
-                .distinctBy { it.link }   // remove duplicatas da lista da API
-                .filter { it.link != link } // remove o próprio item aberto
+                .distinctBy { it.link }
+                .filter { it.link != link }
                 .shuffled()
                 .take(20)
         }
     }
 
-    // loadedKeys e errorKeys no ViewModel
+    // Sets normais + versão reativa para notificar o Compose
     private val _loadedKeys = mutableSetOf<String>()
     private val _errorKeys = mutableSetOf<String>()
 
@@ -71,14 +80,22 @@ class ImageSearchViewModel(
         if (_errorKeys.add(link)) errorKeysVersion++
     }
 
-    fun isLoaded(link: String) = link in _loadedKeys
-    fun isError(link: String) = link in _errorKeys
+    fun isLoaded(link: String): Boolean {
+        @Suppress("UNUSED_EXPRESSION") loadedKeysVersion
+        return link in _loadedKeys
+    }
+
+    fun isError(link: String): Boolean {
+        @Suppress("UNUSED_EXPRESSION") errorKeysVersion
+        return link in _errorKeys
+    }
 
     fun search(newQuery: String) {
         if (newQuery.isBlank() || newQuery == _query.value) return
         _colorCache.clear()
         _loadedKeys.clear()
         _errorKeys.clear()
+        _transparentKeys.clear()
         _suggestionsCache.clear()
         loadedKeysVersion = 0
         errorKeysVersion = 0

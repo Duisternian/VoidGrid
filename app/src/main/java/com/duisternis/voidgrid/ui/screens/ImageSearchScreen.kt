@@ -1,5 +1,6 @@
 package com.duisternis.voidgrid.ui.screens
 
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -74,7 +75,6 @@ fun ImageSearchScreen(
                 key = { index -> index }
             ) { index ->
                 val item = pagingItems[index] ?: return@items
-
                 val isError = viewModel.isError(item.link)
 
                 if (!isError) {
@@ -82,7 +82,6 @@ fun ImageSearchScreen(
                         item.width.toFloat() / item.height.toFloat()
                     else 0.75f
 
-                    // ImageRequest cacheado — não recriado a cada recomposição
                     val imageRequest = remember(item.link) {
                         ImageRequest.Builder(context)
                             .data(item.encodedLink)
@@ -92,6 +91,9 @@ fun ImageSearchScreen(
                             .precision(Precision.INEXACT)
                             .build()
                     }
+
+                    // Lê do cache reativo — recompõe quando markTransparent é chamado
+                    val isTransparent = viewModel.isTransparent(item.link)
 
                     Box(
                         modifier = Modifier
@@ -103,7 +105,7 @@ fun ImageSearchScreen(
                             }
                     ) {
                         DominantColorBox(
-                            thumbnailUrl = item.encodedThumbnail,
+                            thumbnailUrl = if (isTransparent) null else item.encodedThumbnail,
                             imageLoader = imageLoader,
                             modifier = Modifier.fillMaxWidth().aspectRatio(aspectRatio)
                         ) {
@@ -112,8 +114,28 @@ fun ImageSearchScreen(
                                 imageLoader = imageLoader,
                                 contentDescription = null,
                                 contentScale = ContentScale.FillWidth,
-                                onSuccess = { viewModel.markLoaded(item.link) },
-                                onError = { viewModel.markError(item.link) },
+                                onSuccess = { result ->
+                                    viewModel.markLoaded(item.link)
+                                    // Detecta transparência — copia pra SOFTWARE antes de ler pixels
+                                    // pois bitmaps HARDWARE não suportam getPixels()
+                                    val hwBitmap = (result.result.drawable as? BitmapDrawable)?.bitmap
+                                    if (hwBitmap != null && hwBitmap.hasAlpha()) {
+                                        val bitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                                        if (bitmap != null) {
+                                            val pixels = IntArray(bitmap.width * bitmap.height)
+                                            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                                            val transparentCount = pixels.count { (it ushr 24) and 0xFF < 200 }
+                                            if (transparentCount > pixels.size * 0.05) {
+                                                viewModel.markTransparent(item.link)
+                                            }
+                                            bitmap.recycle()
+                                        }
+                                    }
+                                },
+                                onError = {
+                                    viewModel.markError(item.link)
+                                    android.util.Log.e("VoidGrid", "Erro ao carregar imagem: ${item.encodedLink} | erro: ${it.result.throwable}")
+                                },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
@@ -121,10 +143,6 @@ fun ImageSearchScreen(
                 }
             }
 
-            // Footer de paginação: aparece só quando o Paging está buscando
-            // a próxima leva (chegou no fim dos itens já carregados). É o
-            // feedback visual de "tá carregando mais", exatamente onde o
-            // usuário está olhando quando o scroll trava na borda.
             if (pagingItems.loadState.append is LoadState.Loading) {
                 item(span = StaggeredGridItemSpan.FullLine) {
                     Box(
@@ -142,7 +160,6 @@ fun ImageSearchScreen(
             }
         }
 
-        // Barra de busca e Loading
         Column(modifier = Modifier.fillMaxWidth()) {
             Spacer(modifier = Modifier.fillMaxWidth().background(Color.Black).statusBarsPadding())
             OutlinedTextField(

@@ -2,7 +2,6 @@ package com.duisternis.voidgrid.ui.components
 
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -16,11 +15,13 @@ import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import com.duisternis.voidgrid.ui.viewmodel.ImageSearchViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 
 // ─── Extrai cor dominante do thumbnail com cache no ViewModel ─────────────────
+// thumbnailUrl = null desativa o gradiente (usado pra imagens transparentes)
 
 @Composable
 fun DominantColorBox(
@@ -32,53 +33,58 @@ fun DominantColorBox(
 ) {
     val context = LocalContext.current
 
-    // Verifica cache antes de extrair
     val cached = thumbnailUrl?.let { viewModel.colorCache[it] }
     var dominantColor by remember(thumbnailUrl) {
         mutableStateOf(cached ?: Color(0xFF1A1A1A))
     }
 
-    // Só anima quando a cor é extraída "ao vivo" (primeira vez que aquele
-    // thumbnail aparece). Itens que já vêm do cache (ex: ao rolar de volta)
-    // mostram a cor final direto, sem tween — evita N animações de 600ms
-    // rodando em paralelo quando muitos cards aparecem juntos no scroll.
-    val skipAnimation = cached != null
+    LaunchedEffect(thumbnailUrl, viewModel.colorCache.size) {
+        thumbnailUrl?.let { url ->
+            viewModel.colorCache[url]?.let { dominantColor = it }
+        }
+    }
 
     LaunchedEffect(thumbnailUrl) {
         if (thumbnailUrl == null) return@LaunchedEffect
-
-        // Se já tem no cache, não precisa extrair novamente
         if (viewModel.colorCache.containsKey(thumbnailUrl)) return@LaunchedEffect
 
-        withContext(Dispatchers.IO) {
-            try {
+        try {
+            val bitmap = withContext(Dispatchers.IO) {
                 val request = ImageRequest.Builder(context)
                     .data(thumbnailUrl)
                     .size(50)
                     .allowHardware(false)
                     .build()
                 val result = imageLoader.execute(request)
-                if (result is SuccessResult) {
-                    val bitmap = (result.drawable as? BitmapDrawable)?.bitmap
-                    bitmap?.let {
-                        val palette = Palette.from(it).generate()
-                        val swatch = palette.dominantSwatch
-                            ?: palette.vibrantSwatch
-                            ?: palette.mutedSwatch
-                        swatch?.let { s ->
-                            val color = Color(s.rgb)
-                            viewModel.cacheColor(thumbnailUrl, color)
-                            dominantColor = color
-                        }
-                    }
+                if (result is SuccessResult)
+                    (result.drawable as? BitmapDrawable)?.bitmap
+                else null
+            }
+
+            bitmap?.let { bmp ->
+                val palette = withContext(Dispatchers.Default) {
+                    Palette.from(bmp).generate()
                 }
-            } catch (_: Exception) { }
-        }
+                val swatch = palette.dominantSwatch
+                    ?: palette.vibrantSwatch
+                    ?: palette.mutedSwatch
+                swatch?.let { s ->
+                    val color = Color(s.rgb)
+                    viewModel.cacheColor(thumbnailUrl, color)
+                    dominantColor = color
+                }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) { }
     }
 
+    // thumbnailUrl null = sem gradiente, fundo transparente
+    val targetColor = if (thumbnailUrl == null) Color.Transparent else dominantColor
+
     val animatedColor by animateColorAsState(
-        targetValue = dominantColor,
-        animationSpec = if (skipAnimation) snap() else tween(600),
+        targetValue = targetColor,
+        animationSpec = tween(600),
         label = "dominantColor"
     )
 
@@ -90,9 +96,7 @@ fun DominantColorBox(
 
     Box(
         modifier = modifier.background(
-            Brush.verticalGradient(
-                colors = listOf(animatedColor, darkVariant)
-            )
+            Brush.verticalGradient(colors = listOf(animatedColor, darkVariant))
         )
     ) {
         content()

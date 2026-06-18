@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -20,6 +21,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -53,9 +55,6 @@ fun ImageSearchScreen(
     val gridState = rememberLazyStaggeredGridState()
     val context = LocalContext.current
 
-    val loadedVersion = viewModel.loadedKeysVersion
-    val errorVersion = viewModel.errorKeysVersion
-
     LaunchedEffect(hasQuery, pagingItems.loadState.source.refresh) {
         val isNewSearch = pagingItems.loadState.source.refresh is LoadState.Loading && hasQuery
         if (isNewSearch) gridState.scrollToItem(0)
@@ -77,10 +76,6 @@ fun ImageSearchScreen(
                 val item = pagingItems[index] ?: return@items
 
                 val isError = viewModel.isError(item.link)
-                val isLoaded = viewModel.isLoaded(item.link)
-
-                @Suppress("UNUSED_EXPRESSION")
-                loadedVersion + errorVersion
 
                 if (!isError) {
                     val aspectRatio = if (item.width > 0 && item.height > 0)
@@ -98,9 +93,10 @@ fun ImageSearchScreen(
                             .build()
                     }
 
-                    Card(
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
                             .clickable {
                                 focusManager.clearFocus()
                                 selectedItem = item
@@ -121,6 +117,26 @@ fun ImageSearchScreen(
                                 modifier = Modifier.fillMaxSize()
                             )
                         }
+                    }
+                }
+            }
+
+            // Footer de paginação: aparece só quando o Paging está buscando
+            // a próxima leva (chegou no fim dos itens já carregados). É o
+            // feedback visual de "tá carregando mais", exatamente onde o
+            // usuário está olhando quando o scroll trava na borda.
+            if (pagingItems.loadState.append is LoadState.Loading) {
+                item(span = StaggeredGridItemSpan.FullLine) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
                 }
             }

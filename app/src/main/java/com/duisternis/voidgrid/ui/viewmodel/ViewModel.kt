@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.cachedIn
+import com.duisternis.voidgrid.data.model.SearchItem
 import com.duisternis.voidgrid.data.repository.ImageSearchRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,8 +16,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
-
-// ─── ViewModel de busca de imagens ───────────────────────────────────────────
 
 class ImageSearchViewModel(
     private val repository: ImageSearchRepository
@@ -32,20 +31,33 @@ class ImageSearchViewModel(
         .flatMapLatest { repository.searchImages(it) }
         .cachedIn(viewModelScope)
 
-    // Cache de cores — sobrevive a recomposições
-    private val _colorCache = mutableMapOf<String, Color>()
+    // Cache de cores reativo — mutableStateMapOf notifica o Compose quando atualiza
+    private val _colorCache = androidx.compose.runtime.mutableStateMapOf<String, Color>()
     val colorCache: Map<String, Color> get() = _colorCache
 
     fun cacheColor(thumbnailUrl: String, color: Color) {
         _colorCache[thumbnailUrl] = color
     }
 
-    // loadedKeys e errorKeys no ViewModel — evita recomposição do grid inteiro
-    // usando Set<String> com mutableStateOf para notificar só quem lê cada chave
+    // Cache de sugestões fixas por link:
+    // - filtra o item original E deduplica por link antes de shufflar
+    // - garante que fechar/reabrir a dialog mostre sempre as mesmas sugestões
+    private val _suggestionsCache = mutableMapOf<String, List<SearchItem>>()
+
+    fun getSuggestions(link: String, allImages: List<SearchItem>): List<SearchItem> {
+        return _suggestionsCache.getOrPut(link) {
+            allImages
+                .distinctBy { it.link }   // remove duplicatas da lista da API
+                .filter { it.link != link } // remove o próprio item aberto
+                .shuffled()
+                .take(20)
+        }
+    }
+
+    // loadedKeys e errorKeys no ViewModel
     private val _loadedKeys = mutableSetOf<String>()
     private val _errorKeys = mutableSetOf<String>()
 
-    // Estado observável para o Compose saber quando atualizar
     var loadedKeysVersion by mutableStateOf(0)
         private set
     var errorKeysVersion by mutableStateOf(0)
@@ -67,6 +79,7 @@ class ImageSearchViewModel(
         _colorCache.clear()
         _loadedKeys.clear()
         _errorKeys.clear()
+        _suggestionsCache.clear()
         loadedKeysVersion = 0
         errorKeysVersion = 0
         _query.value = newQuery

@@ -2,6 +2,7 @@ package com.duisternis.voidgrid.ui.components
 
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -37,6 +38,12 @@ fun DominantColorBox(
         mutableStateOf(cached ?: Color(0xFF1A1A1A))
     }
 
+    // Só anima quando a cor é extraída "ao vivo" (primeira vez que aquele
+    // thumbnail aparece). Itens que já vêm do cache (ex: ao rolar de volta)
+    // mostram a cor final direto, sem tween — evita N animações de 600ms
+    // rodando em paralelo quando muitos cards aparecem juntos no scroll.
+    val skipAnimation = cached != null
+
     LaunchedEffect(thumbnailUrl) {
         if (thumbnailUrl == null) return@LaunchedEffect
 
@@ -71,7 +78,7 @@ fun DominantColorBox(
 
     val animatedColor by animateColorAsState(
         targetValue = dominantColor,
-        animationSpec = tween(600),
+        animationSpec = if (skipAnimation) snap() else tween(600),
         label = "dominantColor"
     )
 

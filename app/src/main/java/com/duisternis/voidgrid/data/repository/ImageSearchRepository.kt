@@ -48,9 +48,15 @@ class ImageSearchRepository(
     fun searchImages(query: String): Flow<PagingData<SearchItem>> =
         Pager(
             config = PagingConfig(
-                pageSize = 20,
-                initialLoadSize = 20,
-                prefetchDistance = 5,
+                pageSize = 15,
+                initialLoadSize = 15,
+                // Com o spinner de "carregando mais" agora visível no fim da
+                // grid, não precisamos de um prefetch tão alto quanto antes —
+                // o objetivo deixou de ser "nunca travar" e passou a ser
+                // "quando travar, mostrar que tá carregando" (como o Cosmos).
+                // 8 dá uma margem pequena sem fazer o spinner praticamente
+                // nunca aparecer.
+                prefetchDistance = 8,
                 enablePlaceholders = false
             ),
             pagingSourceFactory = { SearchPagingSource(this, query) }

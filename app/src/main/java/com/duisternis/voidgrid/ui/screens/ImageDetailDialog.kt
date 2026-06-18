@@ -75,13 +75,13 @@ fun ImageDetailDialog(
 
                             // Imagem principal com DominantColorBox
                             DominantColorBox(
-                                thumbnailUrl = currentItem.thumbnail,
+                                thumbnailUrl = currentItem.encodedThumbnail,
                                 imageLoader = imageLoader,
                                 modifier = Modifier.fillMaxWidth().wrapContentHeight()
                             ) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
-                                        .data(currentItem.link.replace(" ", "%20"))
+                                        .data(currentItem.encodedLink)
                                         .crossfade(400)
                                         .build(),
                                     imageLoader = imageLoader,
@@ -149,7 +149,7 @@ fun ImageDetailDialog(
                     // Imagens sugeridas com DominantColorBox
                     items(items = suggestedItems, key = { "${it.link}_${it.source}" }) { similar ->
                         DominantColorBox(
-                            thumbnailUrl = similar.thumbnail,
+                            thumbnailUrl = similar.encodedThumbnail,
                             imageLoader = imageLoader,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -159,7 +159,7 @@ fun ImageDetailDialog(
                         ) {
                             AsyncImage(
                                 model = ImageRequest.Builder(LocalContext.current)
-                                    .data(similar.link.replace(" ", "%20"))
+                                    .data(similar.encodedLink)
                                     .crossfade(200)
                                     .build(),
                                 imageLoader = imageLoader,

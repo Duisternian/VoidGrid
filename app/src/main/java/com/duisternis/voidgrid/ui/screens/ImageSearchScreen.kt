@@ -90,7 +90,7 @@ fun ImageSearchScreen(
                     // ImageRequest cacheado — não recriado a cada recomposição
                     val imageRequest = remember(item.link) {
                         ImageRequest.Builder(context)
-                            .data(item.link.replace(" ", "%20"))
+                            .data(item.encodedLink)
                             .crossfade(300)
                             .diskCachePolicy(CachePolicy.ENABLED)
                             .memoryCachePolicy(CachePolicy.ENABLED)
@@ -107,7 +107,7 @@ fun ImageSearchScreen(
                             }
                     ) {
                         DominantColorBox(
-                            thumbnailUrl = item.thumbnail,
+                            thumbnailUrl = item.encodedThumbnail,
                             imageLoader = imageLoader,
                             modifier = Modifier.fillMaxWidth().aspectRatio(aspectRatio)
                         ) {

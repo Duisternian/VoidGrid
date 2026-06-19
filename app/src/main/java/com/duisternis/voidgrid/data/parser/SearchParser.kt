@@ -25,7 +25,7 @@ class SearchParser {
             } ?: emptyList()
             Pair(items, nextS)
         } catch (e: Exception) {
-            logger("Erro ao parsear JSON — primeiros 200 chars: ${jsonString.take(200)}\n${e.message}")
+            logger("Erro ao parser JSON — primeiros 200 chars: ${jsonString.take(200)}\n${e.message}")
             Pair(emptyList(), null)
         }
     }

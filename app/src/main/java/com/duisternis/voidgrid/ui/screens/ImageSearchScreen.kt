@@ -116,8 +116,8 @@ fun ImageSearchScreen(
                                 contentScale = ContentScale.FillWidth,
                                 onSuccess = { result ->
                                     viewModel.markLoaded(item.link)
-                                    // Detecta transparência — copia pra SOFTWARE antes de ler pixels
-                                    // pois bitmaps HARDWARE não suportam getPixels()
+                                    // Deteta transparência — cópia para ‘SOFTWARE’ antes de ler píxeis,
+                                    // pois bitmaps ‘HARDWARE’ não suportam getPixels()
                                     val hwBitmap =
                                         (result.result.drawable as? BitmapDrawable)?.bitmap
                                     if (hwBitmap != null && hwBitmap.hasAlpha()) {

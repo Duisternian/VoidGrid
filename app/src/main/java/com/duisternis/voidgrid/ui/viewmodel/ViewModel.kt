@@ -1,8 +1,8 @@
 package com.duisternis.voidgrid.ui.viewmodel
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
@@ -49,20 +49,20 @@ class ImageSearchViewModel(
 
     fun isTransparent(link: String): Boolean = _transparentKeys[link] == true
 
-    // Cache de sugestões refinadas por link — evita refazer a busca por domínio
-    // toda vez que o usuário troca de imagem dentro do mesmo Dialog
+    // Cache de sugestões refinadas por hiperligação — evita refazer a busca por domínio
+    // toda a vez que o utilizador troca de imagem dentro do mesmo Dialog
     private val _refinedSuggestionsCache = mutableMapOf<String, List<SearchItem>>()
 
-    // Estado reativo do loading das sugestões refinadas, por link
+    // Estado reativo do loading das sugestões refinadas, por hiperligação
     private val _suggestionsLoading = mutableStateMapOf<String, Boolean>()
     fun isSuggestionsLoading(link: String): Boolean = _suggestionsLoading[link] == true
 
     /**
-     * Detecta o domínio mais frequente entre os sources dos resultados,
+     * Deteta o domínio mais frequente entre os sources dos resultados,
      * dispara uma busca refinada "query site:dominio.com" e retorna
      * o resultado embaralhado como sugestões.
      *
-     * Cacheia por link para não refazer a busca de rede ao reabrir a mesma imagem.
+     * Cacheia por hiperligação para não refazer a busca de rede ao reabrir a mesma imagem.
      */
     fun loadRefinedSuggestions(
         link: String,
@@ -103,7 +103,7 @@ class ImageSearchViewModel(
     }
 
     /**
-     * Extrai o domínio mais frequente entre os sources (ex: "zerochan", "deviantart")
+     * Extrai o domínio mais frequente entre os sources (ex: "zerochan", "deviant art")
      * e mapeia para um domínio completo plausível para usar com site:.
      * O source da API já costuma vir como o domínio raiz em minúsculas.
      */
@@ -123,9 +123,9 @@ class ImageSearchViewModel(
     private val _loadedKeys = mutableSetOf<String>()
     private val _errorKeys = mutableSetOf<String>()
 
-    var loadedKeysVersion by mutableStateOf(0)
+    var loadedKeysVersion by mutableIntStateOf(0)
         private set
-    var errorKeysVersion by mutableStateOf(0)
+    var errorKeysVersion by mutableIntStateOf(0)
         private set
 
     fun markLoaded(link: String) {

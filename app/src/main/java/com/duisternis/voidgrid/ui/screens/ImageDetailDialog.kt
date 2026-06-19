@@ -79,7 +79,7 @@ fun ImageDetailDialog(
                     label = "contentFade"
                 ) { activeItem ->
 
-                    // Sugestões refinadas por domínio dominante — busca em background
+                    // Sugestões refinadas por domínio dominante — busca em formação de base
                     var suggestedItems by remember(activeItem.link) {
                         mutableStateOf<List<SearchItem>>(emptyList())
                     }

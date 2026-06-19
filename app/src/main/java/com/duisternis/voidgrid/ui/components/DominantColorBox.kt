@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 
 // ─── Extrai cor dominante do thumbnail com cache no ViewModel ─────────────────
-// thumbnailUrl = null desativa o gradiente (usado pra imagens transparentes)
+// thumbnailUrl = null desativa o gradiente (usado para imagens transparentes)
 
 @Composable
 fun DominantColorBox(

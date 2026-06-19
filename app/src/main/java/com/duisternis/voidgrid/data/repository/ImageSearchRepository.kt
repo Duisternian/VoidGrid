@@ -14,19 +14,17 @@ class ImageSearchRepository(
     private val api: DuckDuckGoApi,
     private val parser: SearchParser
 ) {
-    // ‘Token’ VQD cacheado por query — cada query tem o seu próprio ‘token’
-    private var cachedQuery: String? = null
+    // Cache key inclui safeSearch — token gerado com safe=on não serve pra safe=off
+    private var cachedQueryKey: String? = null
     private var vqdToken: String? = null
-
-    // Cache separado de ‘tokens’ para buscas refinadas (site:dominio.com)
-    // Evita misturar com o ‘token’ da busca principal
     private val refinedVqdCache = mutableMapOf<String, String>()
 
-    suspend fun fetchImages(query: String, position: Int): Pair<List<SearchItem>, Int?> {
+    suspend fun fetchImages(query: String, position: Int, safeSearch: Boolean): Pair<List<SearchItem>, Int?> {
         return try {
-            if (query != cachedQuery) {
+            val queryKey = "$query|safe=$safeSearch"
+            if (queryKey != cachedQueryKey) {
                 vqdToken = null
-                cachedQuery = query
+                cachedQueryKey = queryKey
             }
 
             if (vqdToken == null) {
@@ -40,7 +38,8 @@ class ImageSearchRepository(
             }
 
             val vqd = vqdToken ?: return Pair(emptyList(), null)
-            val json = api.getImagesJson(query, vqd, position)
+            val safeParam = if (safeSearch) "1" else "-1"
+            val json = api.getImagesJson(query, vqd, position, safeSearch = safeParam)
             parser.parse(json)
         } catch (e: Exception) {
             Log.e("ImageSearchRepository", "Erro ao buscar imagens — query='$query' position=$position", e)
@@ -48,7 +47,7 @@ class ImageSearchRepository(
         }
     }
 
-    fun searchImages(query: String): Flow<PagingData<SearchItem>> =
+    fun searchImages(query: String, safeSearch: Boolean): Flow<PagingData<SearchItem>> =
         Pager(
             config = PagingConfig(
                 pageSize = 15,
@@ -56,15 +55,10 @@ class ImageSearchRepository(
                 prefetchDistance = 8,
                 enablePlaceholders = false
             ),
-            pagingSourceFactory = { SearchPagingSource(this, query) }
+            pagingSourceFactory = { SearchPagingSource(this, query, safeSearch) }
         ).flow
 
-    /**
-     * Busca refinada por domínio (ex: "blame! Manga site:zerochan.‘net’").
-     * Usa cache de ‘token’ próprio, mais leve — pede só 1 página com poucos itens
-     * já que o resultado vai ser embaralhado e usado como sugestão.
-     */
-    suspend fun fetchRefinedByDomain(baseQuery: String, domain: String): List<SearchItem> {
+    suspend fun fetchRefinedByDomain(baseQuery: String, domain: String, safeSearch: Boolean = true): List<SearchItem> {
         val refinedQuery = "$baseQuery site:$domain"
         return try {
             val vqd = refinedVqdCache.getOrPut(refinedQuery) {
@@ -74,11 +68,12 @@ class ImageSearchRepository(
                     ?: return emptyList()
             }
 
-            val json = api.getImagesJson(refinedQuery, vqd, skip = 0)
+            val safeParam = if (safeSearch) "1" else "-1"
+            val json = api.getImagesJson(refinedQuery, vqd, skip = 0, safeSearch = safeParam)
             val (items, _) = parser.parse(json)
             items
         } catch (e: Exception) {
-            Log.e("ImageSearchRepository", "Erro na busca refinada por domínio — query='$refinedQuery'", e)
+            Log.e("ImageSearchRepository", "Erro na busca refinada — query='$refinedQuery'", e)
             emptyList()
         }
     }

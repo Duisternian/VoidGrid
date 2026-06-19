@@ -39,6 +39,7 @@ import com.duisternis.voidgrid.ui.components.DominantColorBox
 import com.duisternis.voidgrid.ui.viewmodel.ImageSearchViewModel
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import androidx.core.graphics.drawable.toDrawable
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -255,6 +256,8 @@ fun ImageDetailDialog(
                                         model = ImageRequest.Builder(LocalContext.current)
                                             .data(similar.encodedLink)
                                             .crossfade(200)
+                                            .placeholder(android.graphics.Color.TRANSPARENT.toDrawable())
+                                            .error(android.graphics.Color.TRANSPARENT.toDrawable())
                                             .build(),
                                         imageLoader = imageLoader,
                                         contentDescription = null,

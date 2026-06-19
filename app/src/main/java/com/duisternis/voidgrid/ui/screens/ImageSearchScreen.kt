@@ -17,9 +17,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,7 +39,9 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import coil.size.Precision
 import com.duisternis.voidgrid.data.model.SearchItem
+import com.duisternis.voidgrid.data.model.SearchProvider
 import com.duisternis.voidgrid.ui.components.DominantColorBox
+import com.duisternis.voidgrid.ui.components.ProviderDropdown
 import com.duisternis.voidgrid.ui.viewmodel.ImageSearchViewModel
 import org.koin.androidx.compose.koinViewModel
 
@@ -52,6 +56,10 @@ fun ImageSearchScreen(
 ) {
     var query by remember { mutableStateOf("") }
     var selectedItem by remember { mutableStateOf<SearchItem?>(null) }
+    var providerMenuExpanded by remember { mutableStateOf(false) }
+    val selectedProvider by viewModel.selectedProvider.collectAsState()
+    val customDomains by viewModel.customDomains.collectAsState()
+    val safeSearch by viewModel.safeSearch.collectAsState()
     val focusManager = LocalFocusManager.current
     val gridState = rememberLazyStaggeredGridState()
     val context = LocalContext.current
@@ -186,6 +194,28 @@ fun ImageSearchScreen(
                     .padding(horizontal = 9.dp, vertical = 7.dp),
                 placeholder = { Text("Pesquisar...") },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray) },
+                trailingIcon = {
+                    Box {
+                        IconButton(onClick = { providerMenuExpanded = true }) {
+                            Icon(
+                                imageVector = Icons.Default.FilterList,
+                                contentDescription = "Provedor de busca: ${selectedProvider.label}",
+                                tint = if (selectedProvider is SearchProvider.All) Color.Gray else Color.White
+                            )
+                        }
+                        ProviderDropdown(
+                            expanded = providerMenuExpanded,
+                            selectedProvider = selectedProvider,
+                            customDomains = customDomains,
+                            safeSearch = safeSearch,
+                            onSelect = { viewModel.selectProvider(it) },
+                            onAddCustom = { viewModel.addAndSelectCustomDomain(it) },
+                            onRemoveCustom = { viewModel.removeCustomDomain(it) },
+                            onToggleSafeSearch = { viewModel.toggleSafeSearch() },
+                            onDismiss = { providerMenuExpanded = false }
+                        )
+                    }
+                },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = {

@@ -7,12 +7,13 @@ import com.duisternis.voidgrid.data.repository.ImageSearchRepository
 
 class SearchPagingSource(
     private val repository: ImageSearchRepository,
-    private val query: String
+    private val query: String,
+    private val safeSearch: Boolean
 ) : PagingSource<Int, SearchItem>() {
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, SearchItem> {
         val position = params.key ?: 0
-        val (items, nextS) = repository.fetchImages(query, position)
+        val (items, nextS) = repository.fetchImages(query, position, safeSearch)
 
         return LoadResult.Page(
             data = items,

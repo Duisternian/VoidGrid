@@ -16,6 +16,7 @@ import com.duisternis.voidgrid.ui.screens.ImageSearchScreen
 import com.duisternis.voidgrid.ui.theme.ImageSearchTheme
 import com.duisternis.voidgrid.ui.viewmodel.ImageSearchViewModel
 import org.koin.androidx.viewmodel.ext.android.viewModel
+import org.koin.compose.KoinContext
 
 // ─── MainActivity ────────────────────────────────────────────────────────────
 class MainActivity : ComponentActivity() {
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
+            KoinContext {
             ImageSearchTheme {
                 // Inicialização do ImageLoader personalizado
                 val imageLoader = remember { createCustomImageLoader(this) }
@@ -49,3 +51,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+    }

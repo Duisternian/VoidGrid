@@ -2,9 +2,11 @@ package com.duisternis.voidgrid.di
 
 import com.duisternis.voidgrid.data.api.DuckDuckGoApi
 import com.duisternis.voidgrid.data.api.RetrofitClient
+import com.duisternis.voidgrid.data.local.ProviderPreferences
 import com.duisternis.voidgrid.data.parser.SearchParser
 import com.duisternis.voidgrid.data.repository.ImageSearchRepository
 import com.duisternis.voidgrid.ui.viewmodel.ImageSearchViewModel
+import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
@@ -21,5 +23,6 @@ val appModule = module {
     single { ImageSearchRepository(get(), get()) }
 
     // ViewModel injetado
-    viewModel { ImageSearchViewModel(get()) }
+    single { ProviderPreferences(androidContext()) }
+    viewModel { ImageSearchViewModel(get(), get()) }
 }

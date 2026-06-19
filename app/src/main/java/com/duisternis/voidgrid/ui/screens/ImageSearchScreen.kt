@@ -118,13 +118,26 @@ fun ImageSearchScreen(
                                     viewModel.markLoaded(item.link)
                                     // Detecta transparência — copia pra SOFTWARE antes de ler pixels
                                     // pois bitmaps HARDWARE não suportam getPixels()
-                                    val hwBitmap = (result.result.drawable as? BitmapDrawable)?.bitmap
+                                    val hwBitmap =
+                                        (result.result.drawable as? BitmapDrawable)?.bitmap
                                     if (hwBitmap != null && hwBitmap.hasAlpha()) {
-                                        val bitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
+                                        val bitmap = hwBitmap.copy(
+                                            android.graphics.Bitmap.Config.ARGB_8888,
+                                            false
+                                        )
                                         if (bitmap != null) {
                                             val pixels = IntArray(bitmap.width * bitmap.height)
-                                            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-                                            val transparentCount = pixels.count { (it ushr 24) and 0xFF < 200 }
+                                            bitmap.getPixels(
+                                                pixels,
+                                                0,
+                                                bitmap.width,
+                                                0,
+                                                0,
+                                                bitmap.width,
+                                                bitmap.height
+                                            )
+                                            val transparentCount =
+                                                pixels.count { (it ushr 24) and 0xFF < 200 }
                                             if (transparentCount > pixels.size * 0.05) {
                                                 viewModel.markTransparent(item.link)
                                             }
@@ -134,7 +147,10 @@ fun ImageSearchScreen(
                                 },
                                 onError = {
                                     viewModel.markError(item.link)
-                                    android.util.Log.e("VoidGrid", "Erro ao carregar imagem: ${item.encodedLink} | erro: ${it.result.throwable}")
+                                    android.util.Log.e(
+                                        "VoidGrid",
+                                        "Erro ao carregar imagem: ${item.encodedLink} | erro: ${it.result.throwable}"
+                                    )
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -210,6 +226,7 @@ fun ImageSearchScreen(
             ImageDetailDialog(
                 item = item,
                 allImages = pagingItems.itemSnapshotList.items,
+                baseQuery = query,
                 onDismiss = { selectedItem = null },
                 imageLoader = imageLoader
             )

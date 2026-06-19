@@ -45,6 +45,7 @@ import org.koin.androidx.compose.koinViewModel
 fun ImageDetailDialog(
     item: SearchItem,
     allImages: List<SearchItem>,
+    baseQuery: String,
     onDismiss: () -> Unit,
     imageLoader: ImageLoader,
     viewModel: ImageSearchViewModel = koinViewModel()
@@ -78,8 +79,20 @@ fun ImageDetailDialog(
                     label = "contentFade"
                 ) { activeItem ->
 
-                    val suggestedItems = remember(activeItem.link) {
-                        viewModel.getSuggestions(activeItem.link, allImages)
+                    // Sugestões refinadas por domínio dominante — busca em background
+                    var suggestedItems by remember(activeItem.link) {
+                        mutableStateOf<List<SearchItem>>(emptyList())
+                    }
+                    val isLoadingSuggestions = viewModel.isSuggestionsLoading(activeItem.link)
+
+                    LaunchedEffect(activeItem.link) {
+                        viewModel.loadRefinedSuggestions(
+                            link = activeItem.link,
+                            baseQuery = baseQuery,
+                            allImages = allImages
+                        ) { result ->
+                            suggestedItems = result
+                        }
                     }
 
                     LazyVerticalStaggeredGrid(
@@ -167,7 +180,9 @@ fun ImageDetailDialog(
                                             }
                                         },
                                         Triple("Favorite", R.drawable.ic_favorite_24) { /* TODO */ },
-                                        Triple("Abrir", R.drawable.ic_open_in_browser_24) { /* TODO */ }
+                                        Triple("Abrir", R.drawable.ic_open_in_browser_24) {
+                                            DownloadUtils.openInBrowser(context, activeItem.link)
+                                        }
                                     )
                                     actionItems.forEach { (label, iconRes, action) ->
                                         Column(
@@ -192,12 +207,24 @@ fun ImageDetailDialog(
                                     }
                                 }
 
-                                Text(
-                                    text = "Mais imagens",
-                                    color = Color.White.copy(alpha = 0.4f),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
-                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Mais imagens",
+                                        color = Color.White.copy(alpha = 0.4f),
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                    if (isLoadingSuggestions) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        CircularProgressIndicator(
+                                            color = Color.White.copy(alpha = 0.4f),
+                                            modifier = Modifier.size(12.dp),
+                                            strokeWidth = 1.5.dp
+                                        )
+                                    }
+                                }
                             }
                         }
 

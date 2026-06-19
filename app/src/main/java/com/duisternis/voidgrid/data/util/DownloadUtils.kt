@@ -8,6 +8,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.core.net.toUri
 import coil.ImageLoader
 import coil.request.ImageRequest
 import coil.request.SuccessResult
@@ -24,6 +25,11 @@ object DownloadUtils {
             putExtra(Intent.EXTRA_TEXT, url)
         }
         context.startActivity(Intent.createChooser(intent, "Compartilhar"))
+    }
+
+    fun openInBrowser(context: Context, url: String) {
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+        context.startActivity(intent)
     }
 
     suspend fun downloadImage(

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.launch
 
 class ImageSearchViewModel(
     private val repository: ImageSearchRepository
@@ -32,7 +33,6 @@ class ImageSearchViewModel(
         .flatMapLatest { repository.searchImages(it) }
         .cachedIn(viewModelScope)
 
-    // Cache de cores reativo — notifica o Compose automaticamente quando atualiza
     private val _colorCache = mutableStateMapOf<String, Color>()
     val colorCache: Map<String, Color> get() = _colorCache
 
@@ -40,7 +40,6 @@ class ImageSearchViewModel(
         _colorCache[thumbnailUrl] = color
     }
 
-    // Links de imagens com transparência detectada no onSuccess — sem gradiente
     private val _transparentKeys = mutableStateMapOf<String, Boolean>()
     val transparentKeys: Map<String, Boolean> get() = _transparentKeys
 
@@ -50,20 +49,77 @@ class ImageSearchViewModel(
 
     fun isTransparent(link: String): Boolean = _transparentKeys[link] == true
 
-    // Cache de sugestões fixas por link
-    private val _suggestionsCache = mutableMapOf<String, List<SearchItem>>()
+    // Cache de sugestões refinadas por link — evita refazer a busca por domínio
+    // toda vez que o usuário troca de imagem dentro do mesmo Dialog
+    private val _refinedSuggestionsCache = mutableMapOf<String, List<SearchItem>>()
 
-    fun getSuggestions(link: String, allImages: List<SearchItem>): List<SearchItem> {
-        return _suggestionsCache.getOrPut(link) {
-            allImages
+    // Estado reativo do loading das sugestões refinadas, por link
+    private val _suggestionsLoading = mutableStateMapOf<String, Boolean>()
+    fun isSuggestionsLoading(link: String): Boolean = _suggestionsLoading[link] == true
+
+    /**
+     * Detecta o domínio mais frequente entre os sources dos resultados,
+     * dispara uma busca refinada "query site:dominio.com" e retorna
+     * o resultado embaralhado como sugestões.
+     *
+     * Cacheia por link para não refazer a busca de rede ao reabrir a mesma imagem.
+     */
+    fun loadRefinedSuggestions(
+        link: String,
+        baseQuery: String,
+        allImages: List<SearchItem>,
+        onResult: (List<SearchItem>) -> Unit
+    ) {
+        _refinedSuggestionsCache[link]?.let {
+            onResult(it)
+            return
+        }
+
+        val dominantDomain = findDominantDomain(allImages)
+        if (dominantDomain == null || baseQuery.isBlank()) {
+            // Sem domínio identificável — usa fallback local embaralhado
+            val fallback = allImages.distinctBy { it.link }.filter { it.link != link }.shuffled().take(20)
+            _refinedSuggestionsCache[link] = fallback
+            onResult(fallback)
+            return
+        }
+
+        _suggestionsLoading[link] = true
+        viewModelScope.launch {
+            val refined = repository.fetchRefinedByDomain(baseQuery, dominantDomain)
                 .distinctBy { it.link }
                 .filter { it.link != link }
                 .shuffled()
                 .take(20)
+
+            val result = refined.ifEmpty {
+                allImages.distinctBy { it.link }.filter { it.link != link }.shuffled().take(20)
+            }
+
+            _refinedSuggestionsCache[link] = result
+            _suggestionsLoading[link] = false
+            onResult(result)
         }
     }
 
-    // Sets normais + versão reativa para notificar o Compose
+    /**
+     * Extrai o domínio mais frequente entre os sources (ex: "zerochan", "deviantart")
+     * e mapeia para um domínio completo plausível para usar com site:.
+     * O source da API já costuma vir como o domínio raiz em minúsculas.
+     */
+    private fun findDominantDomain(allImages: List<SearchItem>): String? {
+        val frequency = allImages
+            .map { it.source }
+            .filter { it.isNotBlank() && it != "unknown" }
+            .groupingBy { it }
+            .eachCount()
+
+        val mostCommon = frequency.maxByOrNull { it.value }?.key ?: return null
+
+        // Garante que tem formato de domínio (com ponto), senão assume .com
+        return if (mostCommon.contains(".")) mostCommon else "$mostCommon.com"
+    }
+
     private val _loadedKeys = mutableSetOf<String>()
     private val _errorKeys = mutableSetOf<String>()
 
@@ -96,7 +152,8 @@ class ImageSearchViewModel(
         _loadedKeys.clear()
         _errorKeys.clear()
         _transparentKeys.clear()
-        _suggestionsCache.clear()
+        _refinedSuggestionsCache.clear()
+        _suggestionsLoading.clear()
         loadedKeysVersion = 0
         errorKeysVersion = 0
         _query.value = newQuery

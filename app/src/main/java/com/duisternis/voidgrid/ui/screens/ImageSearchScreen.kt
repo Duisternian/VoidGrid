@@ -63,16 +63,26 @@ fun ImageSearchScreen(
     val gridState = rememberLazyStaggeredGridState()
     val context = LocalContext.current
 
+    // Altura dinâmica: status bar + campo de busca (56dp) + padding vertical (14dp)
+    val statusBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val searchBarHeight = statusBarHeight + 56.dp + 14.dp
+
     LaunchedEffect(hasQuery, pagingItems.loadState.source.refresh) {
         val isNewSearch = pagingItems.loadState.source.refresh is LoadState.Loading && hasQuery
         if (isNewSearch) gridState.scrollToItem(0)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+
         LazyVerticalStaggeredGrid(
             state = gridState,
             columns = StaggeredGridCells.Fixed(2),
-            contentPadding = PaddingValues(top = 113.dp, start = 8.dp, end = 8.dp, bottom = 8.dp),
+            contentPadding = PaddingValues(
+                top = searchBarHeight - 15.dp,
+                start = 8.dp,
+                end = 8.dp,
+                bottom = 8.dp
+            ),
             verticalItemSpacing = 8.dp,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxSize()
@@ -160,12 +170,27 @@ fun ImageSearchScreen(
             }
         }
 
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Spacer(modifier = Modifier.fillMaxWidth().background(Color.Black).statusBarsPadding())
+        // Fundo preto só na área da status bar
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(WindowInsets.statusBars.asPaddingValues().calculateTopPadding() * 0.1f)
+                .background(Color.Black)
+        )
+
+        // Barra de busca flutuante (sem fundo)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .offset(y = (-22).dp) // ajusta esse valor
+        ) {
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 7.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 9.dp, vertical = 7.dp),
                 placeholder = { Text("Pesquisar...") },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray) },
                 trailingIcon = {

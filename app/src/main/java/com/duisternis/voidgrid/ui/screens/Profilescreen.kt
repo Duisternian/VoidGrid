@@ -182,7 +182,7 @@ private fun FolderCard(
             onDismissRequest = { showDeleteDialog = false },
             containerColor = Color(0xFF1C1C1C),
             title = { Text("Deletar pasta?", color = Color.White) },
-            text = { Text("Todos os pins em \"${folder.name}\" serão removidos.", color = Color.Gray) },
+            text = { Text("Todos os Itens em \"${folder.name}\" serão removidos.", color = Color.Gray) },
             confirmButton = {
                 TextButton(onClick = { onDelete(); showDeleteDialog = false }) {
                     Text("Deletar", color = Color.Red)

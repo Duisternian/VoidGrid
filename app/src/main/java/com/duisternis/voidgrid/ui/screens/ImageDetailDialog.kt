@@ -16,7 +16,10 @@ import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,17 +32,19 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.graphics.drawable.toDrawable
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.duisternis.voidgrid.R
+import com.duisternis.voidgrid.data.local.entity.FolderEntity
 import com.duisternis.voidgrid.data.model.SearchItem
 import com.duisternis.voidgrid.data.util.DownloadUtils
 import com.duisternis.voidgrid.ui.components.DominantColorBox
+import com.duisternis.voidgrid.ui.viewmodel.FavoritesViewModel
 import com.duisternis.voidgrid.ui.viewmodel.ImageSearchViewModel
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
-import androidx.core.graphics.drawable.toDrawable
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -49,7 +54,8 @@ fun ImageDetailDialog(
     baseQuery: String,
     onDismiss: () -> Unit,
     imageLoader: ImageLoader,
-    viewModel: ImageSearchViewModel = koinViewModel()
+    viewModel: ImageSearchViewModel = koinViewModel(),
+    favoritesViewModel: FavoritesViewModel = koinViewModel()
 ) {
     var currentItem by remember(item) { mutableStateOf(item) }
 
@@ -58,6 +64,9 @@ fun ImageDetailDialog(
     val context = LocalContext.current
 
     val actionBarBg = Color(0xFF1F1F1F)
+
+    // Estado do dropdown de pastas
+    var showFolderPicker by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -80,7 +89,10 @@ fun ImageDetailDialog(
                     label = "contentFade"
                 ) { activeItem ->
 
-                    // Sugestões refinadas por domínio dominante — busca em formação de base
+                    // Estado de pin para o item atual
+                    val isPinned by favoritesViewModel.isPinned(activeItem.link).collectAsState(initial = false)
+                    val folders by favoritesViewModel.folders.collectAsState()
+
                     var suggestedItems by remember(activeItem.link) {
                         mutableStateOf<List<SearchItem>>(emptyList())
                     }
@@ -153,58 +165,110 @@ fun ImageDetailDialog(
                                     }
                                 }
 
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 16.dp)
-                                        .background(actionBarBg, RoundedCornerShape(12.dp))
-                                        .padding(vertical = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceEvenly
-                                ) {
-                                    val actionItems = listOf(
-                                        Triple("Compartilhar", R.drawable.ios_share_24) {
-                                            DownloadUtils.shareImage(context, activeItem.link)
-                                        },
-                                        Triple("Baixar", R.drawable.download_24) {
-                                            scope.launch {
-                                                val result = DownloadUtils.downloadImage(
-                                                    context, activeItem.link, imageLoader
-                                                )
-                                                val message = result.fold(
-                                                    onSuccess = { "Imagem salva!" },
-                                                    onFailure = { "Erro ao salvar: ${it.message}" }
-                                                )
-                                                snackbarHostState.showSnackbar(
-                                                    message = message,
-                                                    duration = SnackbarDuration.Short
-                                                )
+                                // Barra de ações
+                                Box {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 16.dp)
+                                            .background(actionBarBg, RoundedCornerShape(12.dp))
+                                            .padding(vertical = 12.dp),
+                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                    ) {
+                                        // Compartilhar
+                                        ActionButton(
+                                            label = "Compartilhar",
+                                            iconRes = R.drawable.ios_share_24,
+                                            onClick = { DownloadUtils.shareImage(context, activeItem.link) }
+                                        )
+
+                                        // Baixar
+                                        ActionButton(
+                                            label = "Baixar",
+                                            iconRes = R.drawable.download_24,
+                                            onClick = {
+                                                scope.launch {
+                                                    val result = DownloadUtils.downloadImage(
+                                                        context, activeItem.link, imageLoader
+                                                    )
+                                                    val message = result.fold(
+                                                        onSuccess = { "Imagem salva!" },
+                                                        onFailure = { "Erro ao salvar: ${it.message}" }
+                                                    )
+                                                    snackbarHostState.showSnackbar(
+                                                        message = message,
+                                                        duration = SnackbarDuration.Short
+                                                    )
+                                                }
                                             }
-                                        },
-                                        Triple("Favorite", R.drawable.ic_favorite_24) { /* TODO */ },
-                                        Triple("Abrir", R.drawable.ic_open_in_browser_24) {
-                                            DownloadUtils.openInBrowser(context, activeItem.link)
-                                        }
-                                    )
-                                    actionItems.forEach { (label, iconRes, action) ->
+                                        )
+
+                                        // Favorite — abre picker ou desativa pin
                                         Column(
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             modifier = Modifier
-                                                .clickable { action() }
+                                                .clickable {
+                                                    if (isPinned) {
+                                                        favoritesViewModel.unpinItem(activeItem.link)
+                                                    } else {
+                                                        showFolderPicker = true
+                                                    }
+                                                }
                                                 .padding(horizontal = 4.dp)
                                         ) {
                                             Icon(
-                                                painter = painterResource(id = iconRes),
-                                                contentDescription = label,
-                                                tint = Color.White,
+                                                imageVector = if (isPinned) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                                contentDescription = "Favorite",
+                                                tint = if (isPinned) Color(0xFFE91E63) else Color.White,
                                                 modifier = Modifier.size(24.dp)
                                             )
                                             Text(
-                                                text = label,
-                                                color = Color.White.copy(alpha = 0.85f),
+                                                text = if (isPinned) "Salvo" else "Favorite",
+                                                color = if (isPinned) Color(0xFFE91E63) else Color.White.copy(alpha = 0.85f),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 modifier = Modifier.padding(top = 4.dp)
                                             )
                                         }
+
+                                        // Abrir
+                                        ActionButton(
+                                            label = "Abrir",
+                                            iconRes = R.drawable.ic_open_in_browser_24,
+                                            onClick = { DownloadUtils.openInBrowser(context, activeItem.link) }
+                                        )
+                                    }
+
+                                    // Dropdown de pastas
+                                    DropdownMenu(
+                                        expanded = showFolderPicker,
+                                        onDismissRequest = { showFolderPicker = false },
+                                        modifier = Modifier.background(Color(0xFF2A2A2A))
+                                    ) {
+                                        FolderPickerContent(
+                                            folders = folders,
+                                            onSelectFolder = { folder ->
+                                                favoritesViewModel.pinItem(activeItem, folder.id)
+                                                showFolderPicker = false
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        message = "Salvo em \"${folder.name}\"",
+                                                        duration = SnackbarDuration.Short
+                                                    )
+                                                }
+                                            },
+                                            onCreateFolder = { name ->
+                                                favoritesViewModel.createFolder(name) { folderId ->
+                                                    favoritesViewModel.pinItem(activeItem, folderId)
+                                                }
+                                                showFolderPicker = false
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(
+                                                        message = "Pasta criada e imagem salva!",
+                                                        duration = SnackbarDuration.Short
+                                                    )
+                                                }
+                                            }
+                                        )
                                     }
                                 }
 
@@ -297,6 +361,114 @@ fun ImageDetailDialog(
                     )
                 }
             }
+        }
+    }
+}
+
+// ─── Botão de ação genérico ───────────────────────────────────────────────────
+
+@Composable
+private fun ActionButton(label: String, iconRes: Int, onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable { onClick() }
+            .padding(horizontal = 4.dp)
+    ) {
+        Icon(
+            painter = painterResource(id = iconRes),
+            contentDescription = label,
+            tint = Color.White,
+            modifier = Modifier.size(24.dp)
+        )
+        Text(
+            text = label,
+            color = Color.White.copy(alpha = 0.85f),
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+    }
+}
+
+// ─── Conteúdo do picker de pastas ────────────────────────────────────────────
+
+@Composable
+private fun FolderPickerContent(
+    folders: List<FolderEntity>,
+    onSelectFolder: (FolderEntity) -> Unit,
+    onCreateFolder: (String) -> Unit
+) {
+    var showNewFolderField by remember { mutableStateOf(false) }
+    var newFolderName by remember { mutableStateOf("") }
+
+    if (folders.isEmpty() && !showNewFolderField) {
+        // Nenhuma pasta ainda — vai direto pro campo de criação
+        LaunchedEffect(Unit) { showNewFolderField = true }
+    }
+
+    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+        // Lista de pastas existentes
+        folders.forEach { folder ->
+            DropdownMenuItem(
+                text = { Text(folder.name, color = Color.White) },
+                onClick = { onSelectFolder(folder) }
+            )
+        }
+
+        // Divisor se houver pastas
+        if (folders.isNotEmpty()) {
+            HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
+        }
+
+        // Campo para criar nova pasta
+        if (showNewFolderField) {
+            Row(
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .width(220.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextField(
+                    value = newFolderName,
+                    onValueChange = { newFolderName = it },
+                    placeholder = { Text("Nome da pasta", color = Color.Gray, style = MaterialTheme.typography.bodySmall) },
+                    singleLine = true,
+                    colors = TextFieldDefaults.colors(
+                        focusedContainerColor = Color(0xFF3A3A3A),
+                        unfocusedContainerColor = Color(0xFF3A3A3A),
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = Color.White,
+                        focusedIndicatorColor = Color.Transparent,
+                        unfocusedIndicatorColor = Color.Transparent
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(
+                    onClick = {
+                        if (newFolderName.isNotBlank()) {
+                            onCreateFolder(newFolderName.trim())
+                            newFolderName = ""
+                            showNewFolderField = false
+                        }
+                    }
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Criar", tint = Color.White)
+                }
+            }
+        } else {
+            DropdownMenuItem(
+                text = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Nova pasta", color = Color.White)
+                    }
+                },
+                onClick = { showNewFolderField = true }
+            )
         }
     }
 }

@@ -1,16 +1,20 @@
 package com.duisternis.voidgrid.ui.components
 
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.AutoAwesome
-import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -27,7 +31,6 @@ sealed class Screen(val route: String) {
 
 data class BottomNavItem(
     val screen: Screen,
-    val label: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 )
@@ -35,47 +38,51 @@ data class BottomNavItem(
 @Composable
 fun BottomNavBar(navController: NavController) {
     val items = listOf(
-        BottomNavItem(Screen.ForYou, "For You", Icons.Filled.AutoAwesome, Icons.Outlined.AutoAwesome),
-        BottomNavItem(Screen.Search, "Buscar", Icons.Filled.Search, Icons.Outlined.Search),
-        BottomNavItem(Screen.Profile, "Pins", Icons.Filled.Person, Icons.Outlined.Person)
+        BottomNavItem(Screen.ForYou, Icons.Filled.Home, Icons.Outlined.Home),
+        BottomNavItem(Screen.Search, Icons.Filled.Search, Icons.Outlined.Search),
+        BottomNavItem(Screen.Profile, Icons.Filled.Folder, Icons.Outlined.FolderOpen)
     )
 
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
-    NavigationBar(
-        containerColor = Color(0xFF111111),
-        tonalElevation = 0.dp,
-        modifier = Modifier.clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(30.dp))
+            .background(Color(0xFF191919))
+            .height(50.dp)
+            .padding(horizontal = 15.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         items.forEach { item ->
             val selected = currentRoute == item.screen.route
-            NavigationBarItem(
-                selected = selected,
-                onClick = {
-                    if (currentRoute != item.screen.route) {
-                        navController.navigate(item.screen.route) {
-                            popUpTo(Screen.Search.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
+
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(40.dp) // tamanho do item clicável
+                    .clip(CircleShape) // indicador sempre circular
+                    .background(
+                        if (selected) Color.White.copy(alpha = 0.1f)
+                        else Color.Transparent
+                    )
+                    .clickable {
+                        if (currentRoute != item.screen.route) {
+                            navController.navigate(item.screen.route) {
+                                popUpTo(Screen.Search.route) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     }
-                },
-                icon = {
-                    Icon(
-                        imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
-                        contentDescription = item.label,
-                        modifier = Modifier.size(24.dp)
-                    )
-                },
-                label = { Text(item.label, style = MaterialTheme.typography.labelSmall) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = Color.White,
-                    selectedTextColor = Color.White,
-                    unselectedIconColor = Color.Gray,
-                    unselectedTextColor = Color.Gray,
-                    indicatorColor = Color.White.copy(alpha = 0.1f)
+            ) {
+                Icon(
+                    imageVector = if (selected) item.selectedIcon else item.unselectedIcon,
+                    contentDescription = null,
+                    tint = if (selected) Color.White else Color.Gray,
+                    modifier = Modifier.size(20.dp)
                 )
-            )
+            }
         }
     }
 }

@@ -1,7 +1,8 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.0.0"
+    alias(libs.plugins.ksp)
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.2.10"
 }
 
 android {
@@ -58,6 +59,9 @@ dependencies {
     implementation("androidx.palette:palette-ktx:1.0.0")
     implementation("androidx.compose.material:material-icons-extended:1.6.8")
 
+    // Navigation
+    implementation("androidx.navigation:navigation-compose:2.7.7")
+
     // Paging 3
     implementation("androidx.paging:paging-runtime-ktx:3.3.0")
     implementation("androidx.paging:paging-compose:3.3.0")
@@ -80,6 +84,11 @@ dependencies {
 
     // Appcompat
     implementation("androidx.appcompat:appcompat:1.7.0")
+
+    // Room
+    implementation("androidx.room:room-runtime:2.7.1")
+    implementation("androidx.room:room-ktx:2.7.1")
+    ksp("androidx.room:room-compiler:2.7.1")
 
     // Koin
     implementation("io.insert-koin:koin-android:4.0.0")

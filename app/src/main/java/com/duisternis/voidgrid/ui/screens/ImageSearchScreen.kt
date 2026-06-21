@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -52,10 +51,10 @@ fun ImageSearchScreen(
     onSearch: (String) -> Unit,
     imageLoader: ImageLoader,
     hasQuery: Boolean,
+    onImageClick: (SearchItem) -> Unit,
     viewModel: ImageSearchViewModel = koinViewModel()
 ) {
     var query by remember { mutableStateOf("") }
-    var selectedItem by remember { mutableStateOf<SearchItem?>(null) }
     var providerMenuExpanded by remember { mutableStateOf(false) }
     val selectedProvider by viewModel.selectedProvider.collectAsState()
     val customDomains by viewModel.customDomains.collectAsState()
@@ -100,7 +99,6 @@ fun ImageSearchScreen(
                             .build()
                     }
 
-                    // Lê do cache reativo — recompõe quando markTransparent é chamado
                     val isTransparent = viewModel.isTransparent(item.link)
 
                     Box(
@@ -109,7 +107,7 @@ fun ImageSearchScreen(
                             .clip(RoundedCornerShape(8.dp))
                             .clickable {
                                 focusManager.clearFocus()
-                                selectedItem = item
+                                onImageClick(item)
                             }
                     ) {
                         DominantColorBox(
@@ -124,41 +122,21 @@ fun ImageSearchScreen(
                                 contentScale = ContentScale.FillWidth,
                                 onSuccess = { result ->
                                     viewModel.markLoaded(item.link)
-                                    // Deteta transparência — cópia para ‘SOFTWARE’ antes de ler píxeis,
-                                    // pois bitmaps ‘HARDWARE’ não suportam getPixels()
-                                    val hwBitmap =
-                                        (result.result.drawable as? BitmapDrawable)?.bitmap
+                                    val hwBitmap = (result.result.drawable as? BitmapDrawable)?.bitmap
                                     if (hwBitmap != null && hwBitmap.hasAlpha()) {
-                                        val bitmap = hwBitmap.copy(
-                                            android.graphics.Bitmap.Config.ARGB_8888,
-                                            false
-                                        )
+                                        val bitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
                                         if (bitmap != null) {
                                             val pixels = IntArray(bitmap.width * bitmap.height)
-                                            bitmap.getPixels(
-                                                pixels,
-                                                0,
-                                                bitmap.width,
-                                                0,
-                                                0,
-                                                bitmap.width,
-                                                bitmap.height
-                                            )
-                                            val transparentCount =
-                                                pixels.count { (it ushr 24) and 0xFF < 200 }
-                                            if (transparentCount > pixels.size * 0.05) {
-                                                viewModel.markTransparent(item.link)
-                                            }
+                                            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                                            val transparentCount = pixels.count { (it ushr 24) and 0xFF < 200 }
+                                            if (transparentCount > pixels.size * 0.05) viewModel.markTransparent(item.link)
                                             bitmap.recycle()
                                         }
                                     }
                                 },
                                 onError = {
                                     viewModel.markError(item.link)
-                                    android.util.Log.e(
-                                        "VoidGrid",
-                                        "Erro ao carregar imagem: ${item.encodedLink} | erro: ${it.result.throwable}"
-                                    )
+                                    android.util.Log.e("VoidGrid", "Erro ao carregar imagem: ${item.encodedLink} | erro: ${it.result.throwable}")
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -170,9 +148,7 @@ fun ImageSearchScreen(
             if (pagingItems.loadState.append is LoadState.Loading) {
                 item(span = StaggeredGridItemSpan.FullLine) {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 24.dp),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator(
@@ -189,9 +165,7 @@ fun ImageSearchScreen(
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 9.dp, vertical = 7.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 7.dp),
                 placeholder = { Text("Pesquisar...") },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Color.Gray) },
                 trailingIcon = {
@@ -242,24 +216,12 @@ fun ImageSearchScreen(
             ) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     LinearProgressIndicator(
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .padding(bottom = 5.dp),
+                        modifier = Modifier.fillMaxWidth(0.9f).padding(bottom = 5.dp),
                         color = Color.White.copy(alpha = 0.8f),
                         trackColor = Color.Transparent
                     )
                 }
             }
-        }
-
-        selectedItem?.let { item ->
-            ImageDetailDialog(
-                item = item,
-                allImages = pagingItems.itemSnapshotList.items,
-                baseQuery = query,
-                onDismiss = { selectedItem = null },
-                imageLoader = imageLoader
-            )
         }
     }
 }

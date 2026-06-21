@@ -5,6 +5,7 @@ junit = "4.13.2"
 junitVersion = "1.1.5"
 espressoCore = "3.5.1"
 lifecycleRuntimeKtx = "2.6.1"
+ksp = "2.3.9"
 activityCompose = "1.8.0"
 kotlin = "2.2.10"
 composeBom = "2024.10.00"
@@ -32,4 +33,4 @@ junit-junit = { group = "junit", name = "junit", version.ref = "junitJunit" }
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

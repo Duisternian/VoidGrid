@@ -247,7 +247,15 @@ fun ImageDetailDialog(
                                         FolderPickerContent(
                                             folders = folders,
                                             onSelectFolder = { folder ->
-                                                favoritesViewModel.pinItem(activeItem, folder.id)
+                                                // sourceQuery = baseQuery: sempre a busca que abriu
+                                                // este dialog, mesmo que o usuário esteja salvando
+                                                // uma das sugestões ("Mais imagens") em vez do item
+                                                // original que abriu a tela.
+                                                favoritesViewModel.pinItem(
+                                                    item = activeItem,
+                                                    folderId = folder.id,
+                                                    sourceQuery = baseQuery
+                                                )
                                                 showFolderPicker = false
                                                 scope.launch {
                                                     snackbarHostState.showSnackbar(
@@ -258,7 +266,11 @@ fun ImageDetailDialog(
                                             },
                                             onCreateFolder = { name ->
                                                 favoritesViewModel.createFolder(name) { folderId ->
-                                                    favoritesViewModel.pinItem(activeItem, folderId)
+                                                    favoritesViewModel.pinItem(
+                                                        item = activeItem,
+                                                        folderId = folderId,
+                                                        sourceQuery = baseQuery
+                                                    )
                                                 }
                                                 showFolderPicker = false
                                                 scope.launch {

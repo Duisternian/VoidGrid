@@ -1,10 +1,11 @@
 package com.duisternis.voidgrid.di
 
+import coil.ImageLoader
 import com.duisternis.voidgrid.data.api.DuckDuckGoApi
 import com.duisternis.voidgrid.data.api.RetrofitClient
-import com.duisternis.voidgrid.data.local.dao.PinsDao
 import com.duisternis.voidgrid.data.local.ProviderPreferences
 import com.duisternis.voidgrid.data.local.VoidGridDatabase
+import com.duisternis.voidgrid.data.local.dao.PinsDao
 import com.duisternis.voidgrid.data.parser.SearchParser
 import com.duisternis.voidgrid.data.repository.FavoritesRepository
 import com.duisternis.voidgrid.data.repository.ImageSearchRepository
@@ -16,15 +17,26 @@ import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 val appModule = module {
+
+    // Data Layer: API, Parsers & Image Loader
     single { SearchParser() }
     single<DuckDuckGoApi> { RetrofitClient.duckDuckGoApi }
-    single { ImageSearchRepository(get(), get()) }
-    single { ProviderPreferences(androidContext()) }
+    single { ImageLoader.Builder(androidContext()).build() } // Adicionado para o Coil
 
-    // Room
+    // Repositories
+    single { ImageSearchRepository(get(), get()) }
+    single {
+        FavoritesRepository(
+            dao = get(),
+            imageLoader = get(),
+            appContext = androidContext()
+        )
+    }
+
+    // Local Storage / Database
+    single { ProviderPreferences(androidContext()) }
     single { VoidGridDatabase.create(androidContext()) }
     single<PinsDao> { get<VoidGridDatabase>().pinsDao() }
-    single { FavoritesRepository(get()) }
 
     // ViewModels
     viewModel { ImageSearchViewModel(get(), get()) }

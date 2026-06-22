@@ -5,6 +5,8 @@ import androidx.paging.PagingState
 import com.duisternis.voidgrid.data.model.SearchItem
 import com.duisternis.voidgrid.data.repository.ImageSearchRepository
 
+// SEM MUDANÇAS — a busca manual do usuário não usa filtro de cor automático,
+// então esta classe continua usando String puro normalmente.
 class SearchPagingSource(
     private val repository: ImageSearchRepository,
     private val query: String,

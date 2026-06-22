@@ -40,8 +40,12 @@ class FavoritesViewModel(
             pins.map { with(repository) { it.toSearchItem() } }
         }
 
-    fun pinItem(item: SearchItem, folderId: Long) {
-        viewModelScope.launch { repository.pinItem(item, folderId) }
+    /**
+     * @param sourceQuery a busca ativa na tela no momento do save (baseQuery
+     * do ImageDetailDialog). Veja FavoritesRepository.pinItem para detalhes.
+     */
+    fun pinItem(item: SearchItem, folderId: Long, sourceQuery: String? = null) {
+        viewModelScope.launch { repository.pinItem(item, folderId, sourceQuery) }
     }
 
     fun unpinItem(link: String) {

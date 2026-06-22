@@ -10,7 +10,7 @@ import com.duisternis.voidgrid.data.local.entity.PinEntity
 
 @Database(
     entities = [FolderEntity::class, PinEntity::class],
-    version = 1,
+    version = 2, // incrementado por causa do campo tags
     exportSchema = false
 )
 abstract class VoidGridDatabase : RoomDatabase() {
@@ -19,7 +19,7 @@ abstract class VoidGridDatabase : RoomDatabase() {
     companion object {
         fun create(context: Context): VoidGridDatabase =
             Room.databaseBuilder(context, VoidGridDatabase::class.java, "voidgrid.db")
-                .fallbackToDestructiveMigration()
+                .fallbackToDestructiveMigration() // apaga e recria — ok em dev
                 .build()
     }
 }

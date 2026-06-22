@@ -14,14 +14,18 @@ class ImageSearchRepository(
     private val api: DuckDuckGoApi,
     private val parser: SearchParser
 ) {
-    // Cache key inclui safeSearch — token gerado com safe=on não serve pra safe=off
     private var cachedQueryKey: String? = null
     private var vqdToken: String? = null
     private val refinedVqdCache = mutableMapOf<String, String>()
 
-    suspend fun fetchImages(query: String, position: Int, safeSearch: Boolean): Pair<List<SearchItem>, Int?> {
+    suspend fun fetchImages(
+        query: String,
+        position: Int,
+        safeSearch: Boolean,
+        colorFilter: String? = null
+    ): Pair<List<SearchItem>, Int?> {
         return try {
-            val queryKey = "$query|safe=$safeSearch"
+            val queryKey = "$query|safe=$safeSearch|color=$colorFilter"
             if (queryKey != cachedQueryKey) {
                 vqdToken = null
                 cachedQueryKey = queryKey
@@ -31,18 +35,23 @@ class ImageSearchRepository(
                 val html = api.getVqdToken(query)
                 vqdToken = """vqd=["']?([0-9-]+)["']?""".toRegex()
                     .find(html)?.groupValues?.getOrNull(1)
-                    .also { token ->
-                        if (token == null) Log.w("ImageSearchRepository", "Token VQD não encontrado para query='$query'")
-                        else Log.d("ImageSearchRepository", "Token VQD obtido para query='$query'")
-                    }
             }
 
             val vqd = vqdToken ?: return Pair(emptyList(), null)
             val safeParam = if (safeSearch) "1" else "-1"
-            val json = api.getImagesJson(query, vqd, position, safeSearch = safeParam)
+            val filtersParam = colorFilter?.let { ",,,,,color:$it" } ?: ",,,,,"
+
+            // CORREÇÃO: O argumento nomeado agora é 'skip' para coincidir com a interface
+            val json = api.getImagesJson(
+                query = query,
+                vqd = vqd,
+                skip = position,
+                safeSearch = safeParam,
+                filters = filtersParam
+            )
             parser.parse(json)
         } catch (e: Exception) {
-            Log.e("ImageSearchRepository", "Erro ao buscar imagens — query='$query' position=$position", e)
+            Log.e("ImageSearchRepository", "Erro ao buscar imagens", e)
             Pair(emptyList(), null)
         }
     }
@@ -69,11 +78,18 @@ class ImageSearchRepository(
             }
 
             val safeParam = if (safeSearch) "1" else "-1"
-            val json = api.getImagesJson(refinedQuery, vqd, skip = 0, safeSearch = safeParam)
+
+            // Ajustado para manter compatibilidade com a interface
+            val json = api.getImagesJson(
+                query = refinedQuery,
+                vqd = vqd,
+                skip = 0,
+                safeSearch = safeParam
+            )
             val (items, _) = parser.parse(json)
             items
         } catch (e: Exception) {
-            Log.e("ImageSearchRepository", "Erro na busca refinada — query='$refinedQuery'", e)
+            Log.e("ImageSearchRepository", "Erro na busca refinada", e)
             emptyList()
         }
     }

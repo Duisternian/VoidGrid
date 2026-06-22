@@ -90,6 +90,9 @@ dependencies {
     implementation("androidx.room:room-ktx:2.7.1")
     ksp("androidx.room:room-compiler:2.7.1")
 
+    // ML Kit — classificação de imagens (roda local, sem internet, sem custo)
+    implementation("com.google.mlkit:image-labeling:17.0.9")
+
     // Koin
     implementation("io.insert-koin:koin-android:4.0.0")
     implementation("io.insert-koin:koin-androidx-compose:4.0.0")

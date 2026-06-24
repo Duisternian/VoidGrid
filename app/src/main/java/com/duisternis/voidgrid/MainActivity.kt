@@ -20,7 +20,7 @@ import com.duisternis.voidgrid.data.util.LocalImageLoader
 import com.duisternis.voidgrid.data.util.createCustomImageLoader
 import com.duisternis.voidgrid.ui.components.BottomNavBar
 import com.duisternis.voidgrid.ui.components.Screen
-import com.duisternis.voidgrid.ui.screens.ForYouScreen
+import com.duisternis.voidgrid.ui.viewmodel.ForYouScreen
 import com.duisternis.voidgrid.ui.screens.ImageDetailDialog
 import com.duisternis.voidgrid.ui.screens.ImageSearchScreen
 import com.duisternis.voidgrid.ui.screens.ProfileScreen

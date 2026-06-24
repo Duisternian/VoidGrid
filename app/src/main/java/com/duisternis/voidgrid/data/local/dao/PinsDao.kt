@@ -13,6 +13,9 @@ interface PinsDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertFolder(folder: FolderEntity): Long
 
+    @Update
+    suspend fun updateFolder(folder: FolderEntity)
+
     @Delete
     suspend fun deleteFolder(folder: FolderEntity)
 
@@ -39,7 +42,6 @@ interface PinsDao {
     @Query("DELETE FROM pins WHERE link = :link")
     suspend fun deletePinByLink(link: String)
 
-    // Capa da pasta — pega o pin mais recente
     @Query("SELECT * FROM pins WHERE folderId = :folderId ORDER BY savedAt DESC LIMIT 1")
     fun getCoverPin(folderId: Long): Flow<PinEntity?>
 }

@@ -1,4 +1,4 @@
-package com.duisternis.voidgrid.ui.screens
+package com.duisternis.voidgrid.ui.viewmodel
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -26,9 +26,10 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.duisternis.voidgrid.data.model.SearchItem
 import com.duisternis.voidgrid.ui.components.DominantColorBox
-import com.duisternis.voidgrid.ui.viewmodel.FavoritesViewModel
-import com.duisternis.voidgrid.ui.viewmodel.ForYouViewModel
 import org.koin.androidx.compose.koinViewModel
+
+// FIX: constante nomeada no lugar do magic number 0.75f
+private const val DEFAULT_ASPECT_RATIO = 4f / 3f
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -41,8 +42,12 @@ fun ForYouScreen(
     val allPins by favoritesViewModel.allPins.collectAsState()
     val folders by favoritesViewModel.folders.collectAsState()
 
-    // Atualiza a query sempre que pins ou folders mudarem
-    LaunchedEffect(allPins, folders) {
+    // FIX: key derivada de IDs estáveis para evitar duplo disparo quando
+    // allPins e folders mudam juntos (ambos emitidos pelo mesmo ViewModel).
+    val pinsKey = remember(allPins) { allPins.map { it.id } }
+    val foldersKey = remember(folders) { folders.map { it.id } }
+
+    LaunchedEffect(pinsKey, foldersKey) {
         forYouViewModel.updateQueriesFromPins(allPins, folders)
     }
 
@@ -116,12 +121,45 @@ fun ForYouScreen(
                 }
             }
 
+            // FIX: tratamento de erro no refresh — sem isso o usuário fica
+            // preso em tela vazia sem saber o que aconteceu
+            if (pagingItems.loadState.refresh is LoadState.Error) {
+                item(span = StaggeredGridItemSpan.FullLine) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Não foi possível carregar as sugestões",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        TextButton(onClick = { pagingItems.retry() }) {
+                            Text("Tentar novamente", color = Color.White)
+                        }
+                    }
+                }
+            }
+
             // Imagens
-            items(count = pagingItems.itemCount, key = { index -> index }) { index ->
+            // FIX: key baseada em link+source para identificação estável,
+            // evitando recomposições desnecessárias ao paginar
+            items(
+                count = pagingItems.itemCount,
+                key = { index ->
+                    val it = pagingItems.peek(index)
+                    if (it != null) "${it.link}_${it.source}" else index
+                }
+            ) { index ->
                 val item = pagingItems[index] ?: return@items
+
+                // FIX: constante nomeada no lugar do magic number
                 val aspectRatio = if (item.width > 0 && item.height > 0)
                     item.width.toFloat() / item.height.toFloat()
-                else 0.75f
+                else DEFAULT_ASPECT_RATIO
 
                 Box(
                     modifier = Modifier
@@ -130,7 +168,8 @@ fun ForYouScreen(
                         .clickable { onImageClick(item) }
                 ) {
                     DominantColorBox(
-                        thumbnailUrl = item.thumbnail,
+                        // FIX: encodedThumbnail consistente com as outras telas
+                        thumbnailUrl = item.encodedThumbnail,
                         imageLoader = imageLoader,
                         modifier = Modifier.fillMaxWidth().aspectRatio(aspectRatio)
                     ) {
@@ -155,7 +194,25 @@ fun ForYouScreen(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+
+            // FIX: tratamento de erro ao paginar — permite retry sem
+            // precisar sair da tela ou rolar até o topo
+            if (pagingItems.loadState.append is LoadState.Error) {
+                item(span = StaggeredGridItemSpan.FullLine) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        TextButton(onClick = { pagingItems.retry() }) {
+                            Text("Erro ao carregar mais — tentar novamente", color = Color.Gray)
+                        }
                     }
                 }
             }

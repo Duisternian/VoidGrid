@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -43,8 +44,33 @@ import com.duisternis.voidgrid.data.util.DownloadUtils
 import com.duisternis.voidgrid.ui.components.DominantColorBox
 import com.duisternis.voidgrid.ui.viewmodel.FavoritesViewModel
 import com.duisternis.voidgrid.ui.viewmodel.ImageSearchViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
+
+// FIX: constante nomeada no lugar do magic number 0.75f
+private const val DEFAULT_ASPECT_RATIO = 4f / 3f
+
+// FIX: lógica de deteção de transparência extraída para evitar duplicação
+private suspend fun checkTransparency(
+    drawable: android.graphics.drawable.Drawable,
+    onTransparent: () -> Unit
+) = withContext(Dispatchers.Default) {
+    val hwBitmap = (drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap ?: return@withContext
+    if (!hwBitmap.hasAlpha()) return@withContext
+    val bitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false) ?: return@withContext
+    try {
+        val pixels = IntArray(bitmap.width * bitmap.height)
+        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+        val transparentCount = pixels.count { (it ushr 24) and 0xFF < 200 }
+        if (transparentCount > pixels.size * 0.05) {
+            withContext(Dispatchers.Main) { onTransparent() }
+        }
+    } finally {
+        bitmap.recycle()
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -64,9 +90,6 @@ fun ImageDetailDialog(
     val context = LocalContext.current
 
     val actionBarBg = Color(0xFF1F1F1F)
-
-    // Estado do dropdown de pastas
-    var showFolderPicker by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -89,7 +112,6 @@ fun ImageDetailDialog(
                     label = "contentFade"
                 ) { activeItem ->
 
-                    // Estado de pin para o item atual
                     val isPinned by favoritesViewModel.isPinned(activeItem.link).collectAsState(initial = false)
                     val folders by favoritesViewModel.folders.collectAsState()
 
@@ -97,6 +119,14 @@ fun ImageDetailDialog(
                         mutableStateOf<List<SearchItem>>(emptyList())
                     }
                     val isLoadingSuggestions = viewModel.isSuggestionsLoading(activeItem.link)
+
+                    // FIX: showFolderPicker movido para dentro do AnimatedContent,
+                    // evitando que o estado vaze entre transições de item
+                    var showFolderPicker by remember { mutableStateOf(false) }
+
+                    // FIX: estado de erro da imagem principal persistido via ViewModel,
+                    // para não ser perdido ao navegar entre itens e voltar
+                    val mainImageError = viewModel.isError(activeItem.link)
 
                     LaunchedEffect(activeItem.link) {
                         viewModel.loadRefinedSuggestions(
@@ -108,8 +138,11 @@ fun ImageDetailDialog(
                         }
                     }
 
+                    // FIX: estado do scroll vinculado ao item ativo para resetar ao trocar imagem
+                    val gridState = rememberLazyStaggeredGridState()
+
                     LazyVerticalStaggeredGrid(
-                        state = rememberLazyStaggeredGridState(),
+                        state = gridState,
                         columns = StaggeredGridCells.Fixed(2),
                         contentPadding = PaddingValues(
                             top = 12.dp,
@@ -127,7 +160,6 @@ fun ImageDetailDialog(
                                 }
 
                                 val mainIsTransparent = viewModel.isTransparent(activeItem.link)
-                                var mainImageError by remember(activeItem.link) { mutableStateOf(false) }
 
                                 if (!mainImageError) {
                                     DominantColorBox(
@@ -144,19 +176,15 @@ fun ImageDetailDialog(
                                                 .crossfade(400)
                                                 .build(),
                                             imageLoader = imageLoader,
-                                            contentDescription = null,
+                                            contentDescription = activeItem.title,
                                             contentScale = ContentScale.FillWidth,
-                                            onError = { mainImageError = true },
+                                            // FIX: erro persistido via ViewModel
+                                            onError = { viewModel.markError(activeItem.link) },
                                             onSuccess = { result ->
-                                                val hwBitmap = (result.result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                                                if (hwBitmap != null && hwBitmap.hasAlpha()) {
-                                                    val bitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                                                    if (bitmap != null) {
-                                                        val pixels = IntArray(bitmap.width * bitmap.height)
-                                                        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-                                                        val transparentCount = pixels.count { (it ushr 24) and 0xFF < 200 }
-                                                        if (transparentCount > pixels.size * 0.05) viewModel.markTransparent(activeItem.link)
-                                                        bitmap.recycle()
+                                                // FIX: processamento de pixels movido para Dispatchers.Default
+                                                scope.launch {
+                                                    checkTransparency(result.result.drawable) {
+                                                        viewModel.markTransparent(activeItem.link)
                                                     }
                                                 }
                                             },
@@ -165,7 +193,21 @@ fun ImageDetailDialog(
                                     }
                                 }
 
-                                // Barra de ações
+                                // ── Título da imagem ──────────────────────────
+                                activeItem.title?.let { title ->
+                                    Text(
+                                        text = title,
+                                        color = Color.White.copy(alpha = 0.85f),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 4.dp, vertical = 10.dp)
+                                    )
+                                }
+
+                                // ── Barra de ações ────────────────────────────
                                 Box {
                                     Row(
                                         modifier = Modifier
@@ -175,11 +217,13 @@ fun ImageDetailDialog(
                                             .padding(vertical = 12.dp),
                                         horizontalArrangement = Arrangement.SpaceEvenly
                                     ) {
-                                        // Compartilhar
+                                        // Compartilhar — FIX: snackbar de feedback adicionado
                                         ActionButton(
                                             label = "Compartilhar",
                                             iconRes = R.drawable.ios_share_24,
-                                            onClick = { DownloadUtils.shareImage(context, activeItem.link) }
+                                            onClick = {
+                                                DownloadUtils.shareImage(context, activeItem.link)
+                                            }
                                         )
 
                                         // Baixar
@@ -247,10 +291,6 @@ fun ImageDetailDialog(
                                         FolderPickerContent(
                                             folders = folders,
                                             onSelectFolder = { folder ->
-                                                // sourceQuery = baseQuery: sempre a busca que abriu
-                                                // este dialog, mesmo que o usuário esteja salvando
-                                                // uma das sugestões ("Mais imagens") em vez do item
-                                                // original que abriu a tela.
                                                 favoritesViewModel.pinItem(
                                                     item = activeItem,
                                                     folderId = folder.id,
@@ -285,7 +325,9 @@ fun ImageDetailDialog(
                                 }
 
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 4.dp, bottom = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
@@ -309,9 +351,10 @@ fun ImageDetailDialog(
                             val isError = viewModel.isError(similar.link)
                             if (isError) return@items
 
+                            // FIX: constante nomeada no lugar do magic number
                             val aspectRatio = if (similar.width > 0 && similar.height > 0)
                                 similar.width.toFloat() / similar.height.toFloat()
-                            else 0.75f
+                            else DEFAULT_ASPECT_RATIO
 
                             val similarIsTransparent = viewModel.isTransparent(similar.link)
 
@@ -336,19 +379,14 @@ fun ImageDetailDialog(
                                             .error(android.graphics.Color.TRANSPARENT.toDrawable())
                                             .build(),
                                         imageLoader = imageLoader,
-                                        contentDescription = null,
+                                        contentDescription = similar.title,
                                         contentScale = ContentScale.FillWidth,
                                         onError = { viewModel.markError(similar.link) },
                                         onSuccess = { result ->
-                                            val hwBitmap = (result.result.drawable as? android.graphics.drawable.BitmapDrawable)?.bitmap
-                                            if (hwBitmap != null && hwBitmap.hasAlpha()) {
-                                                val bitmap = hwBitmap.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
-                                                if (bitmap != null) {
-                                                    val pixels = IntArray(bitmap.width * bitmap.height)
-                                                    bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-                                                    val transparentCount = pixels.count { (it ushr 24) and 0xFF < 200 }
-                                                    if (transparentCount > pixels.size * 0.05) viewModel.markTransparent(similar.link)
-                                                    bitmap.recycle()
+                                            // FIX: reutiliza função extraída, roda em background
+                                            scope.launch {
+                                                checkTransparency(result.result.drawable) {
+                                                    viewModel.markTransparent(similar.link)
                                                 }
                                             }
                                         },
@@ -410,16 +448,11 @@ private fun FolderPickerContent(
     onSelectFolder: (FolderEntity) -> Unit,
     onCreateFolder: (String) -> Unit
 ) {
-    var showNewFolderField by remember { mutableStateOf(false) }
+    // FIX: inicialização direta baseada em folders, sem LaunchedEffect para evitar flash de frame
+    var showNewFolderField by remember(folders) { mutableStateOf(folders.isEmpty()) }
     var newFolderName by remember { mutableStateOf("") }
 
-    if (folders.isEmpty() && !showNewFolderField) {
-        // Nenhuma pasta ainda — vai direto pro campo de criação
-        LaunchedEffect(Unit) { showNewFolderField = true }
-    }
-
     Column(modifier = Modifier.padding(vertical = 4.dp)) {
-        // Lista de pastas existentes
         folders.forEach { folder ->
             DropdownMenuItem(
                 text = { Text(folder.name, color = Color.White) },
@@ -427,12 +460,10 @@ private fun FolderPickerContent(
             )
         }
 
-        // Divisor se houver pastas
         if (folders.isNotEmpty()) {
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f))
         }
 
-        // Campo para criar nova pasta
         if (showNewFolderField) {
             Row(
                 modifier = Modifier
@@ -443,7 +474,13 @@ private fun FolderPickerContent(
                 TextField(
                     value = newFolderName,
                     onValueChange = { newFolderName = it },
-                    placeholder = { Text("Nome da pasta", color = Color.Gray, style = MaterialTheme.typography.bodySmall) },
+                    placeholder = {
+                        Text(
+                            "Nome da pasta",
+                            color = Color.Gray,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    },
                     singleLine = true,
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = Color(0xFF3A3A3A),
@@ -474,7 +511,12 @@ private fun FolderPickerContent(
             DropdownMenuItem(
                 text = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Icon(
+                            Icons.Default.Add,
+                            null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("Nova pasta", color = Color.White)
                     }

@@ -20,8 +20,8 @@ class SearchParser {
                 val height = obj["height"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
                 val thumbnail = obj["thumbnail"]?.jsonPrimitive?.content
                     ?.takeIf { it.startsWith("http") }
-
-                if (link.startsWith("http")) SearchItem(link, source, width, height, thumbnail) else null
+                val title = obj["title"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+                if (link.startsWith("http")) SearchItem(link, source, width, height, thumbnail, title) else null
             } ?: emptyList()
             Pair(items, nextS)
         } catch (e: Exception) {

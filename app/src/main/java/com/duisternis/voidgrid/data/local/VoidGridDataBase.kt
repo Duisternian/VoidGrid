@@ -10,7 +10,7 @@ import com.duisternis.voidgrid.data.local.entity.PinEntity
 
 @Database(
     entities = [FolderEntity::class, PinEntity::class],
-    version = 2, // incrementado por causa do campo tags
+    version = 3, // v2→v3: remove pins.tags, adiciona folders.categories
     exportSchema = false
 )
 abstract class VoidGridDatabase : RoomDatabase() {
